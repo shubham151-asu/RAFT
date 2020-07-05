@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package gRPC;
+
+message RequestVote {
+	    int64 term = 1;
+	    int64 candidateID = 2;
+	    int64 lastLogIndex  = 3;
+	    int64 lastLogTerm = 4;
+}
+message ResponseVote {
+        int64 term = 1;
+        bool voteGranted = 2;
+}
+message RequestAppend {
+	    int64 term = 1;
+	    int64 leaderId = 2;
+	    int64 prevLogIndex  = 3;
+	    int64 prevLogTerm = 4;
+	    message logEntry{
+		string command = 1;
+		int64 term = 2;
+	    }
+	    repeated logEntry entries = 5;
+	    int64 leaderCommit = 6;
+}
+
+message ResponseAppend {
+        int64 term = 1;
+        bool success = 2;
+}
+
+message ClientResponse {
+	bool success = 1;
+        string result = 2;
+}
+message ClientRequest {
+        string command = 1;
+}
+
+service RPCService {
+    rpc RequestVoteRPC(RequestVote) returns (ResponseVote) {}
+    rpc RequestAppendRPC(RequestAppend) returns (ResponseAppend) {}
+    rpc ClientRequestRPC(ClientRequest) returns (ClientResponse) {}
+}
