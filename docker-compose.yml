@@ -1,0 +1,36 @@
+version: '3.1'
+
+services: 
+    server1:
+       build: .
+       ports:
+       - "50001:50001"
+       environment:
+       - CandidateID=1
+       env_file:
+       - config.env
+       command: bash -c "go install /go/src/raftAlgo.com/service/server && /go/bin/server"
+
+    server2:
+       build: .    
+       ports: 
+       - "50002:50002"
+       environment:
+       - CandidateID=2
+       env_file:
+       - config.env
+       command: bash -c "go install /go/src/raftAlgo.com/service/server && /go/bin/server"
+
+    server3:
+       build: .    
+       ports: 
+       - "50003:50003"
+       environment:
+       - CandidateID=3
+       env_file:
+       - config.env
+       command: bash -c "go install /go/src/raftAlgo.com/service/server && /go/bin/server"
+
+
+
+
