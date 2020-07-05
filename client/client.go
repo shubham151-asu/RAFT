@@ -1,18 +1,16 @@
 package main
 
-import
-(
-    "context"
-    "log"
-    "time"
-    "google.golang.org/grpc"
-     pb "../stub"
+import (
+	"context"
+	"log"
+	"time"
+
+	pb "../server/gRPC"
+	"google.golang.org/grpc"
 )
 
-
-
 const (
-	address     = "localhost:50001"
+	address = "localhost:50001"
 )
 
 func main() {
@@ -26,7 +24,7 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	response, err := c.ClientRequestRPC(ctx, &pb.ClientRequest{Command : "add a b"})
+	response, err := c.ClientRequestRPC(ctx, &pb.ClientRequest{Command: "add a b"})
 	if err != nil {
 		log.Fatalf("could not greet: %v", err)
 	}
