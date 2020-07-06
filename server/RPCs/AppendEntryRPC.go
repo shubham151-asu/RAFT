@@ -22,11 +22,10 @@ func (s *server) RequestAppendRPC(ctx context.Context, in *pb.RequestAppend) (*p
 	}
 	log.Printf("Server %v : Received leaderCommit : %v", serverID, in.GetLeaderCommit())
 	//TODO commitIndex
-	return &pb.ResponseAppend{Term: term, Success: false}, nil
+	return &pb.ResponseAppend{Term: s.currentTerm, Success: false}, nil
 }
 
-//AppendRPC in leader
-func AppendRPC(input string, address string) bool {
+func (s *server) AppendRPC(input string, address string) bool {
 	// TODO go routine
 	serverID := os.Getenv("CandidateID")
 	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
@@ -45,10 +44,9 @@ func AppendRPC(input string, address string) bool {
 	// } else {
 	// 	prevLogTerm = 1
 	// }
-	var prevLogIndex int64 = 2
-	var prevLogTerm int64 = 2
-	response, err := c.RequestAppendRPC(ctx, &pb.RequestAppend{Term: term, LeaderId: serverID, PrevLogIndex: prevLogIndex, PrevLogTerm: prevLogTerm,
-		Entries: []*pb.RequestAppendLogEntry{{Command: input, Term: term}}, LeaderCommit: commitIndex})
+	response, err := c.RequestAppendRPC(ctx, &pb.RequestAppend{Term: s.currentTerm, LeaderId: 1,
+		PrevLogIndex: s.lastLogIndex, PrevLogTerm: s.lastLogTerm,
+		Entries: []*pb.RequestAppendLogEntry{{Command: input, Term: s.currentTerm}}, LeaderCommit: 1})
 	if err != nil {
 		log.Fatalf("could not greet: %v", err)
 	}
@@ -57,5 +55,7 @@ func AppendRPC(input string, address string) bool {
 	// TODO update leader data for each worker
 
 	// TODO wait for >50% success response
+
+	// TODO Update server currentTerm in all responses
 	return true
 }
