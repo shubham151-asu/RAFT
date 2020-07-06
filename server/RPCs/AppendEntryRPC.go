@@ -24,10 +24,17 @@ func (s *server) RequestAppendRPC(ctx context.Context, in *pb.RequestAppend) (*p
 	}
 	log.Printf("Server %v : Received leaderCommit : %v",serverId , in.GetLeaderCommit())
 	//TODO commitIndex
+<<<<<<< HEAD
 	return &pb.ResponseAppend{Term:s.currentTerm,Success:false}, nil
 }
 
 func (s* server)AppendRPC(input string,address string) bool{
+=======
+	return &pb.ResponseAppend{Term:term,Success:false}, nil
+}
+
+func AppendRPC(input string,address string) bool{
+>>>>>>> 6757736b6d636bd5c46348b259e3d12daa33dfc7
 	// TODO go routine
 	serverId :=  os.Getenv("CandidateID")
 	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
@@ -46,9 +53,16 @@ func (s* server)AppendRPC(input string,address string) bool{
 	// } else {
 	// 	prevLogTerm = 1
 	// }
+<<<<<<< HEAD
 	response, err := c.RequestAppendRPC(ctx, &pb.RequestAppend{Term: s.currentTerm,LeaderId:1,
 	                                                           PrevLogIndex: s.lastLogIndex, PrevLogTerm :s.lastLogTerm,
 		                                Entries : []*pb.RequestAppendLogEntry{{Command : input,Term : s.currentTerm}}, LeaderCommit: 1})
+=======
+	var prevLogIndex int64 = 2
+	var prevLogTerm int64 = 2
+	response, err := c.RequestAppendRPC(ctx, &pb.RequestAppend{Term: term,LeaderId:serverID, PrevLogIndex: prevLogIndex, PrevLogTerm :prevLogTerm, 
+		Entries : []*pb.RequestAppendLogEntry{{Command : input,Term : term}}, LeaderCommit: commitIndex})
+>>>>>>> 6757736b6d636bd5c46348b259e3d12daa33dfc7
 	if err != nil {
 		log.Fatalf("could not greet: %v", err)
 	}
@@ -56,8 +70,11 @@ func (s* server)AppendRPC(input string,address string) bool{
 	// TODO update leader data for each worker
 
 	// TODO wait for >50% success response
+<<<<<<< HEAD
 
 
 	// TODO Update server currentTerm in all responses
+=======
+>>>>>>> 6757736b6d636bd5c46348b259e3d12daa33dfc7
 	return true
 }
