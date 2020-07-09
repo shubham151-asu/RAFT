@@ -32,7 +32,7 @@ message ResponseAppend {
 
 message ClientResponse {
 	bool success = 1;
-        string result = 2;
+    string result = 2;
 }
 message ClientRequest {
         string command = 1;

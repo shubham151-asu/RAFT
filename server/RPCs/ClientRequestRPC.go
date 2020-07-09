@@ -37,7 +37,7 @@ func (s *server) ClientRequestRPC(ctx context.Context, in *pb.ClientRequest) (*p
 			//TODO Check Leader Status and run AppendEntry threads for all clients and count number of successfull APE
 			if int64(len(s.log)) > s.nextIndex[i-1] {
 				log.Printf("calling apend")
-				if s.AppendRPC(in.GetCommand(), address, int64(i)) {
+				if s.AppendRPC(address, int64(i)) {
 					successCount++
 				}
 				// TODO wait for >50% success response

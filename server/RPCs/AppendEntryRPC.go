@@ -18,6 +18,8 @@ func (s *server) RequestAppendRPC(ctx context.Context, in *pb.RequestAppend) (*p
 	log.Printf("Server %v : Received leaderId : %v", serverID, in.GetLeaderId())
 	log.Printf("Server %v : Received prevLogIndex : %v", serverID, in.GetPrevLogIndex())
 	log.Printf("Server %v : Received prevLogTerm : %v", serverID, in.GetPrevLogTerm())
+	// TODO reset timer
+	s.ResetTimer()
 	if in.GetTerm() < s.currentTerm {
 		return &pb.ResponseAppend{Term: s.currentTerm, Success: false}, nil
 	}
@@ -40,18 +42,18 @@ func (s *server) RequestAppendRPC(ctx context.Context, in *pb.RequestAppend) (*p
 	return &pb.ResponseAppend{Term: s.currentTerm, Success: true}, nil
 }
 
-func (s *server) AppendRPC(input string, address string, serverID int64) bool {
+func (s *server) AppendRPC(address string, serverID int64) bool {
 	// TODO go routine
+
 	leaderId, _ := strconv.Atoi(os.Getenv("CandidateID"))
 	leaderID := int64(leaderId)
-	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
+	conn, err := grpc.Dial(address, grpc.WithInsecure())
 	if err != nil {
-		log.Printf("did not connect: %v", err)
+		log.Fatalf("did not connect: %v", err)
 		return false
 	}
 	defer conn.Close()
 	c := pb.NewRPCServiceClient(conn)
-
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	logLength := len(s.log)
@@ -61,10 +63,6 @@ func (s *server) AppendRPC(input string, address string, serverID int64) bool {
 		log.Printf("nextLogIndex : %v", nextLogIndex)
 		prevLogIndex := nextLogIndex - 1
 		log.Printf("prevLogIndex : %v", prevLogIndex)
-		// if prevLogIndex < 0 {
-		// 	log.Printf("prevLogIndex = %v is < 0", prevLogIndex)
-		// 	return false
-		// }
 		var prevLogTerm int64
 		if prevLogIndex >= 0 {
 			prevLogTerm = s.log[prevLogIndex].Term
