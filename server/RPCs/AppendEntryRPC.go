@@ -22,7 +22,7 @@ func (s *server) RequestAppendRPC(ctx context.Context, in *pb.RequestAppend) (*p
 		return &pb.ResponseAppend{Term: s.currentTerm, Success: false}, nil
 	}
 	log.Printf("lenth of log : %v", len(s.log))
-	if in.GetPrevLogIndex() > 0 && (int64(len(s.log)-1) < in.GetPrevLogIndex() || s.log[in.GetPrevLogIndex()].Term != in.GetPrevLogTerm()) {
+	if in.GetPrevLogIndex() >= 0 && (int64(len(s.log)-1) < in.GetPrevLogIndex() || s.log[in.GetPrevLogIndex()].Term != in.GetPrevLogTerm()) {
 		return &pb.ResponseAppend{Term: s.currentTerm, Success: false}, nil
 	}
 	s.log = s.log[0 : in.GetPrevLogIndex()+1]
