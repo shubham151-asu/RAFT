@@ -6,7 +6,7 @@ import
 	"time"
 	"os"
 	"google.golang.org/grpc"
-	pb "raftAlgo.com/service/server/gRPC"
+	 pb "raftAlgo.com/service/server/gRPC"
 	"context"
 )
 
@@ -16,27 +16,40 @@ func (s *server) RequestVoteRPC(ctx context.Context, in *pb.RequestVote) (*pb.Re
 	candidateId := in.GetCandidateID()
 	lastLogTerm := in.GetLastLogTerm()
 	lastLogIndex := in.GetLastLogIndex()
-	log.Printf("Server %v : Received Term : %v",serverId, term)
-	log.Printf("Server %v : Received CandidateID : %v", serverId, candidateId)
-	log.Printf("Server %v : Received LastLogIndex : %v", serverId, lastLogIndex)
-	log.Printf("Server %v : Received LastLogTerm : %v", serverId, lastLogTerm)
+	log.Printf("Server %v : RequestVoteRPC : Received Term : %v",serverId, term)
+	log.Printf("Server %v : RequestVoteRPC : CandidateID : %v", serverId, candidateId)
+	log.Printf("Server %v : RequestVoteRPC : LastLogIndex : %v", serverId, lastLogIndex)
+	log.Printf("Server %v : RequestVoteRPC : LastLogTerm : %v", serverId, lastLogTerm)
 	//TODO Add code to response for RequestVote
 
 	switch {
 	    case s.currentTerm>term:
 	        return &pb.ResponseVote{Term:s.currentTerm,VoteGranted:false}, nil
-	    case (!s.votedFor  || candidateId>=0) && (s.lastLogTerm>= lastLogTerm && s.lastLogIndex>=lastLogIndex): // This condition needs to be verified
-	        log.Printf("Server %v : vote granted to : %v",serverId, candidateId) // Do Additional things
-	        return &pb.ResponseVote{Term:s.currentTerm,VoteGranted:true}, nil
-	    }
-	return &pb.ResponseVote{Term:s.currentTerm,VoteGranted:false}, nil
+	    case s.lastLogTerm>= lastLogTerm && s.lastLogIndex>=lastLogIndex:
+	        s.currentTerm = term // Because we need to update term for every request or response if higher than current
+	        if s.votedFor==0 {
+	            s.votedFor = candidateId
+	            log.Printf("Server %v : RequestVoteRPC :vote granted to %v for term %v",serverId, candidateId,s.currentTerm) // Do Additional things
+	            return &pb.ResponseVote{Term:s.currentTerm,VoteGranted:true}, nil
+	          } else {
+	            if s.currentTerm==term{
+	                log.Printf("Server %v : RequestVoteRPC : vote not granted to candidate %v as already voted to %v for the current term : %v",serverId, candidateId,s.votedFor,s.currentTerm) // Do Additional things
+	                return &pb.ResponseVote{Term:s.currentTerm,VoteGranted:false}, nil
+	            } else {
+	                s.votedFor = candidateId
+	                log.Printf("Server %v : RequestVoteRPC : vote granted to %v for term %v",serverId, candidateId,s.currentTerm) // Do Additional things
+	                return &pb.ResponseVote{Term:s.currentTerm,VoteGranted:true}, nil
+	            }
+	          }
+    }
+    return &pb.ResponseVote{Term:s.currentTerm,VoteGranted:false}, nil
 }
 
 func (s *server) VoteRPC(address string) (bool){
 	serverId :=  os.Getenv("CandidateID")
 	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
-		log.Fatalf("Server %v : could not connect : error %v", serverId, err)
+		log.Fatalf("Server %v : VoteRPC : could not connect : error %v", serverId, err)
 	}
 	defer conn.Close()
 	c := pb.NewRPCServiceClient(conn)
@@ -45,9 +58,9 @@ func (s *server) VoteRPC(address string) (bool){
 	response, err := c.RequestVoteRPC(ctx, &pb.RequestVote{Term: s.currentTerm,CandidateID:s.serverId,
 	                                                LastLogIndex:s.lastLogIndex,LastLogTerm:s.lastLogTerm})
 	if err != nil {
-		log.Fatalf("Server %v : could not Receive Vote : error %v", serverId, err)
+		log.Fatalf("Server %v : VoteRPC : could not Receive Vote : error %v", serverId, err)
 	}
-	log.Printf("Server %v : Response received %s",serverId, response.String())
+	log.Printf("Server %v : VoteRPC : Response received %s",serverId, response.String())
 
 	// TODO Update server currentTerm in all responses
 

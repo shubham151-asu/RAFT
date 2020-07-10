@@ -7,15 +7,12 @@ import (
 	"os"
 	"strconv"
 	"time"
-
 	pb "raftAlgo.com/service/server/gRPC"
-
 	"google.golang.org/grpc"
 )
 
 func (s *server) ClientRequestRPC(ctx context.Context, in *pb.ClientRequest) (*pb.ClientResponse, error) {
-	log.Printf("Received term : %v", in.GetCommand())
-	//TODO if leader else redirect,  append to log entry for leader
+	log.Printf("Received Command : %v", in.GetCommand())
 	log.Printf("s.leaderId :%v   s.serverId :%v", s.leaderId, s.serverId)
 	if s.leaderId == 0 {
 		return nil, errors.New("Something went wrong, please try again")

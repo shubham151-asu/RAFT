@@ -14,26 +14,26 @@ import (
 
 func (s *server) RequestAppendRPC(ctx context.Context, in *pb.RequestAppend) (*pb.ResponseAppend, error) {
 	serverID := os.Getenv("CandidateID")
-	log.Printf("Server %v : Received term : %v", serverID, in.GetTerm())
-	log.Printf("Server %v : Received leaderId : %v", serverID, in.GetLeaderId())
-	log.Printf("Server %v : Received prevLogIndex : %v", serverID, in.GetPrevLogIndex())
-	log.Printf("Server %v : Received prevLogTerm : %v", serverID, in.GetPrevLogTerm())
+	log.Printf("Server %v : RequestAppendRPC : Received term : %v", serverID, in.GetTerm())
+	log.Printf("Server %v : RequestAppendRPC : Received leaderId : %v", serverID, in.GetLeaderId())
+	log.Printf("Server %v : RequestAppendRPC : Received prevLogIndex : %v", serverID, in.GetPrevLogIndex())
+	log.Printf("Server %v : RequestAppendRPC : Received prevLogTerm : %v", serverID, in.GetPrevLogTerm())
 	// TODO reset timer
 	s.ResetTimer()
 	if in.GetTerm() < s.currentTerm {
 		return &pb.ResponseAppend{Term: s.currentTerm, Success: false}, nil
 	}
-	log.Printf("lenth of log : %v", len(s.log))
+	log.Printf("Server %v : RequestAppendRPC : Length of log : %v", serverID , len(s.log))
 	if in.GetPrevLogIndex() >= 0 && (int64(len(s.log)-1) < in.GetPrevLogIndex() || s.log[in.GetPrevLogIndex()].Term != in.GetPrevLogTerm()) {
 		return &pb.ResponseAppend{Term: s.currentTerm, Success: false}, nil
 	}
 	s.log = s.log[0 : in.GetPrevLogIndex()+1]
 	for i, entry := range in.GetEntries() {
 		//TODO append log entry for worker
-		log.Printf("Server %v : Received entry : %v at index %v", serverID, entry, i)
+		log.Printf("Server %v : RequestAppendRPC : Received entry : %v at index %v", serverID, entry, i)
 		s.log = append(s.log, entry)
 	}
-	log.Printf("Server %v : Received leaderCommit : %v", serverID, in.GetLeaderCommit())
+	log.Printf("Server %v : RequestAppendRPC : Received leaderCommit : %v", serverID, in.GetLeaderCommit())
 	s.leaderId = in.GetLeaderId()
 	if in.GetLeaderCommit() > s.commitIndex {
 		s.commitIndex = int64(math.Min(float64(in.GetLeaderCommit()), float64(len(s.log)-1)))
@@ -49,7 +49,7 @@ func (s *server) AppendRPC(address string, serverID int64) bool {
 	leaderID := int64(leaderId)
 	conn, err := grpc.Dial(address, grpc.WithInsecure())
 	if err != nil {
-		log.Fatalf("did not connect: %v", err)
+		log.Fatalf("Server %v : AppendRPC : did not connect: %v", leaderId , err)
 		return false
 	}
 	defer conn.Close()
@@ -60,9 +60,9 @@ func (s *server) AppendRPC(address string, serverID int64) bool {
 	nextLogIndex := s.nextIndex[serverID-1]
 
 	for nextLogIndex >= 0 {
-		log.Printf("nextLogIndex : %v", nextLogIndex)
+		log.Printf("Server %v : AppendRPC : nextLogIndex : %v", leaderId, nextLogIndex)
 		prevLogIndex := nextLogIndex - 1
-		log.Printf("prevLogIndex : %v", prevLogIndex)
+		log.Printf("Server %v : AppendRPC : prevLogIndex : %v",leaderId, prevLogIndex)
 		var prevLogTerm int64
 		if prevLogIndex >= 0 {
 			prevLogTerm = s.log[prevLogIndex].Term
@@ -71,10 +71,10 @@ func (s *server) AppendRPC(address string, serverID int64) bool {
 			PrevLogIndex: prevLogIndex, PrevLogTerm: prevLogTerm,
 			Entries: s.log[nextLogIndex:], LeaderCommit: s.commitIndex})
 		if err != nil {
-			log.Printf("did not connect: %v", err)
+			log.Fatalf("Server %v : AppendRPC : did not connect: %v", leaderId , err)
 			return false
 		}
-		log.Printf("Server %v : Response Received : %s", serverID, response.String())
+		log.Printf("Server %v : AppendRPC : Response Received : %s", serverID, response.String())
 		if !response.GetSuccess() {
 			if response.GetTerm() > s.currentTerm {
 				// WHAT TO DO WHEN FOLLOWER'S TERM IS HIGHER THAN LEADER?
@@ -94,4 +94,26 @@ func (s *server) AppendRPC(address string, serverID int64) bool {
 
 	// TODO Update server currentTerm in all responses
 	return false
+}
+
+func (s* server) HeartBeat() {
+    leaderId, _ := strconv.Atoi(os.Getenv("CandidateID"))
+    NUMREPLICAS := os.Getenv("NUMREPLICAS")
+	REPLICAS, _ := strconv.Atoi(NUMREPLICAS)
+	log.Printf("Server %v : HeartBeat : NUMBER OF REPLICAS :%v", leaderId , REPLICAS)
+	s.ResetTimer()
+    for i := 1; i <= REPLICAS; i++ {
+			serverId := strconv.Itoa(i)
+			address := "server" + serverId + ":" + os.Getenv("PORT") + serverId
+			log.Printf("Server %v : HeartBeat : Address of the Destination  server : %v",leaderId,address)
+			if int64(i) == s.leaderId {
+				continue
+			}
+			successCount := 1
+			if int64(len(s.log)) > s.nextIndex[i-1] {
+			    if s.AppendRPC(address, int64(i)) {
+					successCount++
+			    }
+			}
+		}
 }

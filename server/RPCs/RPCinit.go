@@ -26,7 +26,7 @@ type server struct {
 	commitIndex  int64
 	lastApplied  int64
 	candidateId  int64
-	votedFor     bool // Done for convinecne
+	votedFor     int64
 	nextIndex    []int64
 	matchIndex   []int64
 	log          []*pb.RequestAppendLogEntry
@@ -43,7 +43,7 @@ func (s *server) initServerDS() {
 	s.commitIndex = 0
 	s.lastApplied = 0
 	s.candidateId = 0
-	s.votedFor = false
+	s.votedFor = 0
 	NUMREPLICAS := os.Getenv("NUMREPLICAS")
 	REPLICAS, _ := strconv.Atoi(NUMREPLICAS)
 	s.nextIndex = make([]int64, REPLICAS)
@@ -57,7 +57,7 @@ func RPCInit() bool {
 	log.Printf("Server %v : Port ID for the current Server : %v", serverId, port)
 	serverobj := server{}
 	serverobj.initServerDS()
-	//go serverobj.ElectionInit()
+	go serverobj.ElectionInit()
 	lis, err := net.Listen("tcp", port)
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
