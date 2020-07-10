@@ -17,6 +17,7 @@ func (s *server) ClientRequestRPC(ctx context.Context, in *pb.ClientRequest) (*p
 	if s.leaderId == 0 {
 		return nil, errors.New("Something went wrong, please try again")
 	} else if s.serverId == s.leaderId {
+	    s.ElectionPreventionTimer()
 		NUMREPLICAS := os.Getenv("NUMREPLICAS")
 		REPLICAS, _ := strconv.Atoi(NUMREPLICAS)
 		log.Printf("NUMBER OF REPLICAS :%v", REPLICAS)

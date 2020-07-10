@@ -12,10 +12,11 @@ import
 
 var RTT int = 10000
 var MTBF int = 50000
-
+var ElectionWaitTime int = 10000
 
 var waitTime int 
 var TimerReset bool = false
+var ElectionWaitTimerReset bool = false
 
 var mutex sync.Mutex
 
@@ -26,6 +27,14 @@ func (s *server)ResetTimer(){
     log.Printf("Server %v : ResetTimer : Timer Reset with WaitTime : %v",candidateId,waitTime)
     mutex.Lock()
     TimerReset = true
+    mutex.Unlock()
+}
+
+func (s *server)ElectionPreventionTimer(){
+    candidateId :=  os.Getenv("CandidateID")
+    log.Printf("Server %v : ElectionPreventionTimer : Timer Reset with WaitTime : %v",candidateId,ElectionWaitTime)
+    mutex.Lock()
+    ElectionWaitTimerReset = true
     mutex.Unlock()
 }
 
@@ -82,6 +91,7 @@ func (s *server) StartElection(done chan bool) {
 		cond.Wait()
 	}
 	if count >= (REPLICAS/2) && !TimerReset {
+	    s.leaderId = int64(CandidateID)
 		log.Printf("Server %v : StartElection : Election for term %v won by %v ",candidateId,s.currentTerm,candidateId)
 		go s.HeartBeat()
 	} else {

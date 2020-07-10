@@ -7,7 +7,6 @@ import (
 	"os"
 	"strconv"
 	"time"
-
 	"google.golang.org/grpc"
 	pb "raftAlgo.com/service/server/gRPC"
 )
@@ -101,19 +100,29 @@ func (s* server) HeartBeat() {
     NUMREPLICAS := os.Getenv("NUMREPLICAS")
 	REPLICAS, _ := strconv.Atoi(NUMREPLICAS)
 	log.Printf("Server %v : HeartBeat : NUMBER OF REPLICAS :%v", leaderId , REPLICAS)
-	s.ResetTimer()
-    for i := 1; i <= REPLICAS; i++ {
-			serverId := strconv.Itoa(i)
-			address := "server" + serverId + ":" + os.Getenv("PORT") + serverId
-			log.Printf("Server %v : HeartBeat : Address of the Destination  server : %v",leaderId,address)
-			if int64(i) == s.leaderId {
-				continue
-			}
-			successCount := 1
-			if int64(len(s.log)) > s.nextIndex[i-1] {
-			    if s.AppendRPC(address, int64(i)) {
-					successCount++
-			    }
-			}
-		}
+	for {
+	    log.Printf("Server %v : ElectionWaitTimer value :%v", leaderId , ElectionWaitTimerReset)
+        s.ResetTimer()
+        if !ElectionWaitTimerReset {
+            for i := 1; i <= REPLICAS; i++ {
+                    serverId := strconv.Itoa(i)
+			        address := "server" + serverId + ":" + os.Getenv("PORT") + serverId
+                    if int64(i) == s.leaderId {
+                        continue
+                    }
+                    log.Printf("Server %v : HeartBeat : Send to Follower : %v",leaderId,i)
+                    s.AppendRPC(address,int64(i)) // Need to parallelize this 
+            }
+        }
+        mutex.Lock()
+        ElectionWaitTimerReset = false
+        mutex.Unlock()
+        time.Sleep(time.Duration(ElectionWaitTime) * time.Millisecond)
+        mutex.Lock()
+        if s.leaderId!=int64(leaderId){
+            mutex.Unlock()
+            break
+            }
+        mutex.Unlock()
+        }
 }
