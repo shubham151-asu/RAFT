@@ -48,10 +48,11 @@ func (s *server) RequestVoteRPC(ctx context.Context, in *pb.RequestVote) (*pb.Re
 func (s *server) VoteRPC(address string) (bool){
     response := false
     serverId :=  os.Getenv("CandidateID")
-    if State==leader {
+    log.Printf("Server %v : VoteRPC : Current State : %v", serverId, State)
+    if State==candidate {
         conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
         if err != nil {
-             log.Fatalf("Server %v : VoteRPC : could not connect : error %v", serverId, err)
+             log.Printf("Server %v : VoteRPC : could not connect : error %v", serverId, err)
         }
         defer conn.Close()
         c := pb.NewRPCServiceClient(conn)
@@ -60,14 +61,14 @@ func (s *server) VoteRPC(address string) (bool){
         response, err := c.RequestVoteRPC(ctx, &pb.RequestVote{Term: s.currentTerm,CandidateID:s.serverId,
                                                    LastLogIndex:s.lastLogIndex,LastLogTerm:s.lastLogTerm})
         if err != nil {
-           log.Fatalf("Server %v : VoteRPC : could not Receive Vote : error %v", serverId, err)
+           log.Printf("Server %v : VoteRPC : could not Receive Vote : error %v", serverId, err)
         }
 
         log.Printf("Server %v : VoteRPC : Response received %s",serverId, response.String())
         return response.GetVoteGranted()
         // TODO Update server currentTerm in all responses
     } else {
-        log.Printf("Server %v : VoteRPC : No Longer a leader ",serverId)
+        log.Printf("Server %v : VoteRPC : No Longer a Candidate State : Current State : %v",serverId,State)
     }
 	return response
 }

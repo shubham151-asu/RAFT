@@ -11,7 +11,7 @@ import
 )
 
 var RTT int = 10000
-var MTBF int = 50000
+var MTBF int = 5000
 var ElectionWaitTime int = 10000
 
 var waitTime int 
@@ -46,7 +46,8 @@ func (s *server) WaitForTimeToExpire(){
         TimerReset = false
         mutex.Unlock()
         time.Sleep(time.Duration(waitTime) * time.Millisecond)
-        if !TimerReset {
+        log.Printf("Server %v : WaitForTimeToExpire : Current State : %v", candidateId, State)
+        if !TimerReset && State==follower{
             log.Printf("Server %v : WaitForTimeToExpire : Timer Expired ",candidateId)
             if s.initCandidateDS() {
 	            log.Printf("Server %v : WaitForTimeToExpire : Candidate Status Granted : %v : Starting Election ",candidateId,State)
@@ -72,43 +73,47 @@ func (s *server) StartElection(done chan bool) {
 	log.Printf("Server %v : StartElection : Election Started ",candidateId)
 	s.currentTerm += 1
 	s.votedFor = int64(CandidateID)
-	for i := 1 ; i<=REPLICAS ; i++ {
-		serverId := strconv.Itoa(i)
-		address := "server"+ serverId + ":"+os.Getenv("PORT")+serverId
-		if serverId!=candidateId{
-		    log.Printf("Server %v : StartElection : address of destination server %s",candidateId, address)
-		    go func(address string) {
-			    vote := s.VoteRPC(address)
-			    mu.Lock()
-			    defer mu.Unlock()
-			        if vote {
-				        count++
-			        }
-			        finished++
-			        cond.Broadcast()
-		    }(address)
-		}
+	log.Printf("Server %v : StartElection : Current State : %v", candidateId, State)
+	if State==candidate {
+        for i := 1 ; i<=REPLICAS ; i++ {
+            serverId := strconv.Itoa(i)
+            address := "server"+ serverId + ":"+os.Getenv("PORT")+serverId
+            if serverId!=candidateId{
+                log.Printf("Server %v : StartElection : address of destination server %s",candidateId, address)
+                go func(address string) {
+                    vote := s.VoteRPC(address)
+                    mu.Lock()
+                    defer mu.Unlock()
+                        if vote {
+                            count++
+                        }
+                        finished++
+                        cond.Broadcast()
+                }(address)
+            }
+        }
+
+        mu.Lock()
+        for count < ((REPLICAS/2)+1) && finished != REPLICAS{
+            cond.Wait()
+        }
+        log.Printf("Server %v : StartElection : Votes Received : %v",candidateId,count)
+        if count >= ((REPLICAS/2)+1) && !TimerReset && State==candidate{
+            log.Printf("Server %v : StartElection : Election for Term : %v won by Server : %v ",candidateId,s.currentTerm,candidateId)
+            if s.initLeaderDS() {
+                log.Printf("Server %v : StartElection : Leader Status Granted : %v Sending HeartBeat ",candidateId,State)
+                go s.HeartBeat()
+            } else {
+                log.Printf("Server %v : StartElection : Unable to start Heartbeat",candidateId)
+            }
+        } else {
+            log.Printf("Server %v : StartElection : Election lost ",candidateId)
+        }
+        mu.Unlock()
+    } else {
+        log.Printf("Server %v : StartElection : No Longer a Candidate State : Current State : %v ",candidateId,State)
     }
-    //time.Sleep(time.Duration(waitTime) * time.Millisecond)
-	mu.Lock()
-	log.Printf("Server %v : StartElection : Votes Received : %v",candidateId,count)
-	for count < (REPLICAS/2) && finished != REPLICAS{
-		cond.Wait()
-	}
-	if count >= (REPLICAS/2) && !TimerReset {
-	    log.Printf("Server %v : StartElection : Election for Term : %v won by Server : %v ",candidateId,s.currentTerm,candidateId)
-	    if s.initLeaderDS() {
-	        log.Printf("Server %v : StartElection : Leader Status Granted : %v Sending HeartBeat ",candidateId,State)
-		    go s.HeartBeat()
- 		} else {
- 		    log.Printf("Server %v : StartElection : Unable to start Heartbeat",candidateId)
- 		}
-	} else {
-		log.Printf("Server %v : StartElection : Election lost ",candidateId)
-	}
-	mu.Unlock()
     done <- true
-    log.Printf("Server %v : StartElection : Returning from Election ",candidateId)
 }
 
 func (s * server) ElectionInit() {

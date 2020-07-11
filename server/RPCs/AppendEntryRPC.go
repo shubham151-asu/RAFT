@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"time"
+	"sync"
 	"google.golang.org/grpc"
 	pb "raftAlgo.com/service/server/gRPC"
 )
@@ -105,7 +106,12 @@ func (s* server) HeartBeat() {
 	for {
 	    log.Printf("Server %v : ElectionWaitTimer value :%v", leaderId , ElectionWaitTimerReset)
         s.ResetTimer()
-        if !ElectionWaitTimerReset {
+        count := 1 // Vote self
+	    finished := 1 // One vote count due to self
+	    var mu sync.Mutex
+	    cond := sync.NewCond(&mu)
+	    log.Printf("Server %v : HeartBeat : Current State : %v", leaderId, State)
+        if !ElectionWaitTimerReset && State==leader{
             for i := 1; i <= REPLICAS; i++ {
                     serverId := strconv.Itoa(i)
 			        address := "server" + serverId + ":" + os.Getenv("PORT") + serverId
@@ -113,15 +119,33 @@ func (s* server) HeartBeat() {
                         continue
                     }
                     log.Printf("Server %v : HeartBeat : Send to Follower : %v",leaderId,i)
-                    s.AppendRPC(address,int64(i)) // Need to parallelize this
+                    go func(address string,id int64) {
+                        success := s.AppendRPC(address,id)
+                        mu.Lock()
+                        defer mu.Unlock()
+                        if success {
+                            count++
+                        }
+                        finished++
+                        cond.Broadcast()
+		            }(address,int64(i))
             }
-        }
+            mu.Lock()
+            for count < ((REPLICAS/2)+1) && finished != REPLICAS{
+                cond.Wait()
+            }
+            log.Printf("Server %v : HeartBeat : Success Count : %v",leaderId,count)
+            if count >= ((REPLICAS/2)+1) && !ElectionWaitTimerReset {
+                log.Printf("Server %v : HeartBeat : Sent Successfully ",leaderId)
+            }
+            mu.Unlock()
+	    }
         mutex.Lock()
         ElectionWaitTimerReset = false
         mutex.Unlock()
         time.Sleep(time.Duration(ElectionWaitTime) * time.Millisecond)
         mutex.Lock()
-        if s.leaderId!=int64(leaderId){
+        if State!=leader{
             mutex.Unlock()
             break
             }
