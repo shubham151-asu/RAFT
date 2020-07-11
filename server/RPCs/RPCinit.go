@@ -16,6 +16,13 @@ type logEntry struct {
 }
 
 //var term , serverID , lastLogIndex , lastLogTerm, commitIndex, lastApplied, leaderId int64 = 2,2,2,2,2,2,2
+const (
+    leader = 2
+    candidate = 1
+    follower = 0
+)
+
+var State = follower
 
 type server struct {
 	pb.UnimplementedRPCServiceServer
@@ -36,7 +43,7 @@ type server struct {
 func (s *server) initServerDS() {
 	serverID, _ := strconv.Atoi(os.Getenv("CandidateID"))
 	serverId := int64(serverID)
-	s.currentTerm = 1
+	s.currentTerm = 0
 	s.serverId = serverId
 	s.lastLogIndex = 1 // Update in Future
 	s.lastLogTerm = 1
@@ -48,8 +55,45 @@ func (s *server) initServerDS() {
 	REPLICAS, _ := strconv.Atoi(NUMREPLICAS)
 	s.nextIndex = make([]int64, REPLICAS)
 	s.matchIndex = make([]int64, REPLICAS)
-	s.leaderId = 1
+	s.leaderId = 0
 }
+
+func (s *server) initLeaderDS() (bool){
+    response := false
+    candidateId :=  os.Getenv("CandidateID")
+	CandidateID, _ := strconv.Atoi(candidateId)
+	NUMREPLICAS := os.Getenv("NUMREPLICAS")
+	REPLICAS, _ := strconv.Atoi(NUMREPLICAS)
+	log.Printf("Server %v : initLeaderDS : Setting Candidate State to Leader State ", candidateId)
+	if State==candidate {
+        State = leader
+        logLength := len(s.log)
+        for i:=0 ; i<REPLICAS; i++ {
+            s.nextIndex[i] = int64(logLength)
+        }
+        s.leaderId = int64(CandidateID)
+        response = true
+    } else {
+        log.Printf("Server %v : initLeaderDS : Unable to set Candidate State to Leader State : Current State : %v ", candidateId,State)
+        response = false
+    }
+    return response
+}
+
+func (s *server) initCandidateDS() (bool) {
+    response := false
+    candidateId :=  os.Getenv("CandidateID")
+    log.Printf("Server %v : initCandidateDS : Setting follower State to Candidate State ", candidateId)
+    if State==follower{
+        State = candidate
+        response = true
+    } else {
+        log.Printf("Server %v : initCandidateDS : Unable to set follower State to Leader State : Current State : %v ", candidateId,State)
+        response = false
+    }
+    return response
+}
+
 
 func RPCInit() bool {
 	port := ":" + os.Getenv("PORT") + os.Getenv("CandidateID")

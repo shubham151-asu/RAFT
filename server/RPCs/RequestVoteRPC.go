@@ -46,23 +46,28 @@ func (s *server) RequestVoteRPC(ctx context.Context, in *pb.RequestVote) (*pb.Re
 }
 
 func (s *server) VoteRPC(address string) (bool){
-	serverId :=  os.Getenv("CandidateID")
-	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
-	if err != nil {
-		log.Fatalf("Server %v : VoteRPC : could not connect : error %v", serverId, err)
-	}
-	defer conn.Close()
-	c := pb.NewRPCServiceClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	response, err := c.RequestVoteRPC(ctx, &pb.RequestVote{Term: s.currentTerm,CandidateID:s.serverId,
-	                                                LastLogIndex:s.lastLogIndex,LastLogTerm:s.lastLogTerm})
-	if err != nil {
-		log.Fatalf("Server %v : VoteRPC : could not Receive Vote : error %v", serverId, err)
-	}
-	log.Printf("Server %v : VoteRPC : Response received %s",serverId, response.String())
+    response := false
+    serverId :=  os.Getenv("CandidateID")
+    if State==leader {
+        conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
+        if err != nil {
+             log.Fatalf("Server %v : VoteRPC : could not connect : error %v", serverId, err)
+        }
+        defer conn.Close()
+        c := pb.NewRPCServiceClient(conn)
+        ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+        defer cancel()
+        response, err := c.RequestVoteRPC(ctx, &pb.RequestVote{Term: s.currentTerm,CandidateID:s.serverId,
+                                                   LastLogIndex:s.lastLogIndex,LastLogTerm:s.lastLogTerm})
+        if err != nil {
+           log.Fatalf("Server %v : VoteRPC : could not Receive Vote : error %v", serverId, err)
+        }
 
-	// TODO Update server currentTerm in all responses
-
-	return response.GetVoteGranted()
+        log.Printf("Server %v : VoteRPC : Response received %s",serverId, response.String())
+        return response.GetVoteGranted()
+        // TODO Update server currentTerm in all responses
+    } else {
+        log.Printf("Server %v : VoteRPC : No Longer a leader ",serverId)
+    }
+	return response
 }

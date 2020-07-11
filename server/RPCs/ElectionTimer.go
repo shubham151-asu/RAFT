@@ -47,10 +47,15 @@ func (s *server) WaitForTimeToExpire(){
         mutex.Unlock()
         time.Sleep(time.Duration(waitTime) * time.Millisecond)
         if !TimerReset {
-	        log.Printf("Server %v : WaitForTimeToExpire : Timer Expired Starting Election",candidateId)
-            go s.StartElection(done)
-            <-done
-        }
+            log.Printf("Server %v : WaitForTimeToExpire : Timer Expired ",candidateId)
+            if s.initCandidateDS() {
+	            log.Printf("Server %v : WaitForTimeToExpire : Candidate Status Granted : %v : Starting Election ",candidateId,State)
+                go s.StartElection(done)
+                <-done
+            } else {
+                log.Printf("Server %v : WaitForTimeToExpire : Unable to Set Candidate Status ",candidateId)
+            }
+         }
     }
 }
 
@@ -91,16 +96,19 @@ func (s *server) StartElection(done chan bool) {
 		cond.Wait()
 	}
 	if count >= (REPLICAS/2) && !TimerReset {
-	    s.leaderId = int64(CandidateID)
-		log.Printf("Server %v : StartElection : Election for term %v won by %v ",candidateId,s.currentTerm,candidateId)
-		go s.HeartBeat()
+	    log.Printf("Server %v : StartElection : Election for Term : %v won by Server : %v ",candidateId,s.currentTerm,candidateId)
+	    if s.initLeaderDS() {
+	        log.Printf("Server %v : StartElection : Leader Status Granted : %v Sending HeartBeat ",candidateId,State)
+		    go s.HeartBeat()
+ 		} else {
+ 		    log.Printf("Server %v : StartElection : Unable to start Heartbeat",candidateId)
+ 		}
 	} else {
 		log.Printf("Server %v : StartElection : Election lost ",candidateId)
 	}
 	mu.Unlock()
     done <- true
     log.Printf("Server %v : StartElection : Returning from Election ",candidateId)
-
 }
 
 func (s * server) ElectionInit() {

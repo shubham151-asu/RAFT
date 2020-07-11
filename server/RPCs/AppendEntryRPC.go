@@ -33,7 +33,7 @@ func (s *server) RequestAppendRPC(ctx context.Context, in *pb.RequestAppend) (*p
 		s.log = append(s.log, entry)
 	}
 	log.Printf("Server %v : RequestAppendRPC : Received leaderCommit : %v", serverID, in.GetLeaderCommit())
-	s.leaderId = in.GetLeaderId()
+	s.leaderId = in.GetLeaderId()  // Need to protect this part
 	if in.GetLeaderCommit() > s.commitIndex {
 		s.commitIndex = int64(math.Min(float64(in.GetLeaderCommit()), float64(len(s.log)-1)))
 	}
@@ -42,57 +42,59 @@ func (s *server) RequestAppendRPC(ctx context.Context, in *pb.RequestAppend) (*p
 }
 
 func (s *server) AppendRPC(address string, serverID int64) bool {
-	// TODO go routine
-
+    response := false
 	leaderId, _ := strconv.Atoi(os.Getenv("CandidateID"))
 	leaderID := int64(leaderId)
-	conn, err := grpc.Dial(address, grpc.WithInsecure())
-	if err != nil {
-		log.Fatalf("Server %v : AppendRPC : did not connect: %v", leaderId , err)
-		return false
-	}
-	defer conn.Close()
-	c := pb.NewRPCServiceClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	logLength := len(s.log)
-	nextLogIndex := s.nextIndex[serverID-1]
+	if State==leader {
+        conn, err := grpc.Dial(address, grpc.WithInsecure())
+        if err != nil {
+            log.Printf("Server %v : AppendRPC : did not connect: %v", leaderId , err)
+            return false
+        }
+        defer conn.Close()
+        c := pb.NewRPCServiceClient(conn)
+        ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+        defer cancel()
+        logLength := len(s.log)
+        nextLogIndex := s.nextIndex[serverID-1]
 
-	for nextLogIndex >= 0 {
-		log.Printf("Server %v : AppendRPC : nextLogIndex : %v", leaderId, nextLogIndex)
-		prevLogIndex := nextLogIndex - 1
-		log.Printf("Server %v : AppendRPC : prevLogIndex : %v",leaderId, prevLogIndex)
-		var prevLogTerm int64
-		if prevLogIndex >= 0 {
-			prevLogTerm = s.log[prevLogIndex].Term
-		}
-		response, err := c.RequestAppendRPC(ctx, &pb.RequestAppend{Term: s.currentTerm, LeaderId: leaderID,
-			PrevLogIndex: prevLogIndex, PrevLogTerm: prevLogTerm,
-			Entries: s.log[nextLogIndex:], LeaderCommit: s.commitIndex})
-		if err != nil {
-			log.Fatalf("Server %v : AppendRPC : did not connect: %v", leaderId , err)
-			return false
-		}
-		log.Printf("Server %v : AppendRPC : Response Received : %s", serverID, response.String())
-		if !response.GetSuccess() {
-			if response.GetTerm() > s.currentTerm {
-				// WHAT TO DO WHEN FOLLOWER'S TERM IS HIGHER THAN LEADER?
-				return false
-			} else {
-				//try again
-				nextLogIndex--
-				s.nextIndex[serverID-1] = nextLogIndex
-			}
-		} else {
-			s.nextIndex[serverID-1] = int64(logLength)
-			//TODO update match index
-			return true
-		}
+        for nextLogIndex >= 0 {
+            log.Printf("Server %v : AppendRPC : nextLogIndex : %v", leaderId, nextLogIndex)
+            prevLogIndex := nextLogIndex - 1
+            log.Printf("Server %v : AppendRPC : prevLogIndex : %v",leaderId, prevLogIndex)
+            var prevLogTerm int64
+            if prevLogIndex >= 0 {
+                prevLogTerm = s.log[prevLogIndex].Term
+            }
+            response, err := c.RequestAppendRPC(ctx, &pb.RequestAppend{Term: s.currentTerm, LeaderId: leaderID,
+                PrevLogIndex: prevLogIndex, PrevLogTerm: prevLogTerm,
+                Entries: s.log[nextLogIndex:], LeaderCommit: s.commitIndex})
+            if err != nil {
+                log.Printf("Server %v : AppendRPC : did not connect: %v", leaderId , err)
+                return false
+            }
+            log.Printf("Server %v : AppendRPC : Response Received : %s", serverID, response.String())
+            if !response.GetSuccess() {
+                if response.GetTerm() > s.currentTerm {
+                    // WHAT TO DO WHEN FOLLOWER'S TERM IS HIGHER THAN LEADER?
+                    return false
+                } else {
+                    //try again
+                    nextLogIndex--
+                    s.nextIndex[serverID-1] = nextLogIndex
+                }
+            } else {
+                s.nextIndex[serverID-1] = int64(logLength)
+                return true
+            }
+	    }
+	} else {
+	    log.Printf("Server %v : AppendRPC : No Longer a leader ",leaderId)
 	}
 	// TODO update leader data for each worker
 
 	// TODO Update server currentTerm in all responses
-	return false
+	return response
 }
 
 func (s* server) HeartBeat() {
@@ -111,7 +113,7 @@ func (s* server) HeartBeat() {
                         continue
                     }
                     log.Printf("Server %v : HeartBeat : Send to Follower : %v",leaderId,i)
-                    s.AppendRPC(address,int64(i)) // Need to parallelize this 
+                    s.AppendRPC(address,int64(i)) // Need to parallelize this
             }
         }
         mutex.Lock()
