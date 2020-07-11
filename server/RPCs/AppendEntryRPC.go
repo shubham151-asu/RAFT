@@ -19,7 +19,7 @@ func (s *server) RequestAppendRPC(ctx context.Context, in *pb.RequestAppend) (*p
 	log.Printf("Server %v : RequestAppendRPC : Received prevLogIndex : %v", serverID, in.GetPrevLogIndex())
 	log.Printf("Server %v : RequestAppendRPC : Received prevLogTerm : %v", serverID, in.GetPrevLogTerm())
 	// TODO reset timer
-	s.ResetTimer()
+	term := in.GetTerm()
 	if in.GetTerm() < s.currentTerm {
 		return &pb.ResponseAppend{Term: s.currentTerm, Success: false}, nil
 	}
@@ -27,6 +27,9 @@ func (s *server) RequestAppendRPC(ctx context.Context, in *pb.RequestAppend) (*p
 	if in.GetPrevLogIndex() >= 0 && (int64(len(s.log)-1) < in.GetPrevLogIndex() || s.log[in.GetPrevLogIndex()].Term != in.GetPrevLogTerm()) {
 		return &pb.ResponseAppend{Term: s.currentTerm, Success: false}, nil
 	}
+	s.ResetTimer() // Once correct has been verified : Reset your Election Timer
+	s.initFollowerDS() // Once correct term has been verified : Go to Follower State no Matter What was previous State was
+    s.currentTerm = term // Updating currentTerm to what sent by leader
 	s.log = s.log[0 : in.GetPrevLogIndex()+1]
 	for i, entry := range in.GetEntries() {
 		//TODO append log entry for worker
@@ -90,7 +93,7 @@ func (s *server) AppendRPC(address string, serverID int64) bool {
             }
 	    }
 	} else {
-	    log.Printf("Server %v : AppendRPC : No Longer a leader ",leaderId)
+	    log.Printf("Server %v : AppendRPC : No Longer a leader : Current State",leaderId,State)
 	}
 	// TODO update leader data for each worker
 

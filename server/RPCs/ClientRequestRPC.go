@@ -52,8 +52,9 @@ func (s *server) ClientRequestRPC(ctx context.Context, in *pb.ClientRequest) (*p
 		address := "server" + strconv.FormatInt(s.leaderId, 10) + ":" + os.Getenv("PORT") + strconv.FormatInt(s.leaderId, 10)
 		log.Printf("Address of the server : %v", address)
 		conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
+		// Need to retry if the servers are busy
 		if err != nil {
-			log.Fatalf("did not connect: %v", err)
+			log.Printf("did not connect: %v", err)
 		}
 		defer conn.Close()
 		c := pb.NewRPCServiceClient(conn)
@@ -61,7 +62,7 @@ func (s *server) ClientRequestRPC(ctx context.Context, in *pb.ClientRequest) (*p
 		defer cancel()
 		response, err := c.ClientRequestRPC(ctx, &pb.ClientRequest{Command: in.GetCommand()})
 		if err != nil {
-			log.Fatalf("could not redirect: %v", err)
+			log.Printf("could not redirect: %v", err)
 		}
 		log.Printf("redirected: %s", response.String())
 		return response, err

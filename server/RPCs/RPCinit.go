@@ -94,6 +94,15 @@ func (s *server) initCandidateDS() (bool) {
     return response
 }
 
+func (s *server) initFollowerDS() (bool) {
+    response := true
+    candidateId :=  os.Getenv("CandidateID")
+    oldState := State
+    State = follower // No matter what was your state get Back to follower
+    log.Printf("Server %v : initCandidateDS : Setting Current State : %v to follower State : %v", candidateId,oldState,State)
+    return response
+}
+
 
 func RPCInit() bool {
 	port := ":" + os.Getenv("PORT") + os.Getenv("CandidateID")

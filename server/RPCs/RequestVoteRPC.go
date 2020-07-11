@@ -26,21 +26,22 @@ func (s *server) RequestVoteRPC(ctx context.Context, in *pb.RequestVote) (*pb.Re
 	    case s.currentTerm>term:
 	        return &pb.ResponseVote{Term:s.currentTerm,VoteGranted:false}, nil
 	    case s.lastLogTerm>= lastLogTerm && s.lastLogIndex>=lastLogIndex:
-	        s.currentTerm = term // Because we need to update term for every request or response if higher than current
 	        if s.votedFor==0 {
 	            s.votedFor = candidateId
 	            log.Printf("Server %v : RequestVoteRPC :vote granted to %v for term %v",serverId, candidateId,s.currentTerm) // Do Additional things
 	            return &pb.ResponseVote{Term:s.currentTerm,VoteGranted:true}, nil
-	          } else {
-	            if s.currentTerm==term{
-	                log.Printf("Server %v : RequestVoteRPC : vote not granted to candidate %v as already voted to %v for the current term : %v",serverId, candidateId,s.votedFor,s.currentTerm) // Do Additional things
-	                return &pb.ResponseVote{Term:s.currentTerm,VoteGranted:false}, nil
-	            } else {
-	                s.votedFor = candidateId
-	                log.Printf("Server %v : RequestVoteRPC : vote granted to %v for term %v",serverId, candidateId,s.currentTerm) // Do Additional things
-	                return &pb.ResponseVote{Term:s.currentTerm,VoteGranted:true}, nil
+	        } else {
+	            switch {
+	               case s.currentTerm==term:
+	                   log.Printf("Server %v : RequestVoteRPC : vote not granted to candidate %v as already voted to %v for the current term : %v",serverId, candidateId,s.votedFor,s.currentTerm) // Do Additional things
+	                   return &pb.ResponseVote{Term:s.currentTerm,VoteGranted:false}, nil
+	               case term>s.currentTerm:
+	                   s.votedFor = candidateId
+	                   s.currentTerm = term
+	                   log.Printf("Server %v : RequestVoteRPC : vote granted to %v for term %v",serverId, candidateId,s.currentTerm) // Do Additional things
+	                   return &pb.ResponseVote{Term:s.currentTerm,VoteGranted:true}, nil
 	            }
-	          }
+	        }
     }
     return &pb.ResponseVote{Term:s.currentTerm,VoteGranted:false}, nil
 }
