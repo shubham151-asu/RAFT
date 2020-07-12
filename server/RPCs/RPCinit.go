@@ -99,7 +99,7 @@ func (s *server) initFollowerDS() (bool) {
     candidateId :=  os.Getenv("CandidateID")
     oldState := State
     State = follower // No matter what was your state get Back to follower
-    log.Printf("Server %v : initCandidateDS : Setting Current State : %v to follower State : %v", candidateId,oldState,State)
+    log.Printf("Server %v : initFollowerDS : Setting Current State : %v to follower State : %v", candidateId,oldState,State)
     return response
 }
 

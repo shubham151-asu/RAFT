@@ -7,54 +7,73 @@ import (
 	"os"
 	"strconv"
 	"time"
+	"sync"
 	pb "raftAlgo.com/service/server/gRPC"
 	"google.golang.org/grpc"
 )
 
 func (s *server) ClientRequestRPC(ctx context.Context, in *pb.ClientRequest) (*pb.ClientResponse, error) {
-	log.Printf("Received Command : %v", in.GetCommand())
-	log.Printf("s.leaderId :%v   s.serverId :%v", s.leaderId, s.serverId)
+    serverId :=  os.Getenv("CandidateID")
+	log.Printf("Server %v :  ClientRequestRPC : Received Command : %v", serverId , in.GetCommand())
+	log.Printf("Server %v :  ClientRequestRPC : State", serverId, State)
+    NUMREPLICAS := os.Getenv("NUMREPLICAS")
+	REPLICAS, _ := strconv.Atoi(NUMREPLICAS)
 	if s.leaderId == 0 {
+	    log.Printf("Server %v :  ClientRequestRPC : No Leader Elected : Come back later", serverId)
 		return nil, errors.New("Something went wrong, please try again")
-	} else if s.serverId == s.leaderId {
+	} else if State==leader {
 	    s.ElectionPreventionTimer()
-		NUMREPLICAS := os.Getenv("NUMREPLICAS")
-		REPLICAS, _ := strconv.Atoi(NUMREPLICAS)
-		log.Printf("NUMBER OF REPLICAS :%v", REPLICAS)
+		log.Printf("Server %v :  ClientRequestRPC : Appending ClientRequest to Logs : Term : %v : Command : %v", serverId,s.currentTerm,in.GetCommand())
 		// Here All server object data will be manipulated
 		s.log = append(s.log, &pb.RequestAppendLogEntry{Command: in.GetCommand(), Term: s.currentTerm})
-		successCount := 1
+		log.Printf("Server %v :  ClientRequestRPC : length of logs : %v", serverId , len(s.log))
+		count := 1 // Vote self
+	    finished := 1 // One vote count due to self
+	    var mu sync.Mutex
+	    cond := sync.NewCond(&mu)
+	    log.Printf("Server %v :  ClientRequestRPC : NUMBER OF REPLICAS :%v", serverId , REPLICAS)
 		for i := 1; i <= REPLICAS; i++ {
 			serverId := strconv.Itoa(i)
 			address := "server" + serverId + ":" + os.Getenv("PORT") + serverId
-			log.Printf("Address of the server : %v", address)
 			if int64(i) == s.leaderId {
 				continue
 			}
-			log.Printf("lenth of log : %v", len(s.log))
-			//TODO Check Leader Status and run AppendEntry threads for all clients and count number of successfull APE
-			if int64(len(s.log)) > s.nextIndex[i-1] {
-				log.Printf("calling apend")
-				if s.AppendRPC(address, int64(i)) {
-					successCount++
-				}
-				// TODO wait for >50% success response
+			log.Printf("Server %v :  ClientRequestRPC : Address of the server:%v", serverId , address)
+			if int64(len(s.log)) > s.nextIndex[i-1] && State==leader {
+				log.Printf("Server %v :  ClientRequestRPC : Calling AppendEntry", serverId)
+				go func(address string,id int64) {
+                    success := s.AppendRPC(address,id)
+                    mu.Lock()
+                    defer mu.Unlock()
+                    if success {
+                        count++
+                    }
+                    finished++
+                    cond.Broadcast()
+		            }(address,int64(i))
 			}
 		}
-		if successCount > REPLICAS/2 {
-			s.commitIndex++
-			return &pb.ClientResponse{Success: true, Result: "a,b added"}, nil // dummy return Ensure code should not come here
+        mu.Lock()
+        for count < ((REPLICAS/2)+1) && finished != REPLICAS{
+            cond.Wait()
+        }
+        log.Printf("Server %v : ClientRequestRPC : Success Count : %v",serverId,count)
+        if count >= ((REPLICAS/2)+1) && State==leader {
+           log.Printf("Server %v : ClientRequestRPC :  Majority Response received : Committing Entry ",serverId)
+           s.commitIndex++
+           return &pb.ClientResponse{Success: true, Result: "a,b added"}, nil //
 		} else {
 			return &pb.ClientResponse{Success: false, Result: "a,b was not added"}, nil
 		}
+		mu.Unlock()
 	} else {
 		//redirect to leader
 		address := "server" + strconv.FormatInt(s.leaderId, 10) + ":" + os.Getenv("PORT") + strconv.FormatInt(s.leaderId, 10)
-		log.Printf("Address of the server : %v", address)
+		log.Printf("Server %v :  ClientRequestRPC : Redirecting to leader with address :%v", serverId , address)
 		conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
 		// Need to retry if the servers are busy
 		if err != nil {
-			log.Printf("did not connect: %v", err)
+			log.Printf("Server %v :  ClientRequestRPC : did not connect: %v", serverId , err)
 		}
 		defer conn.Close()
 		c := pb.NewRPCServiceClient(conn)
@@ -62,9 +81,10 @@ func (s *server) ClientRequestRPC(ctx context.Context, in *pb.ClientRequest) (*p
 		defer cancel()
 		response, err := c.ClientRequestRPC(ctx, &pb.ClientRequest{Command: in.GetCommand()})
 		if err != nil {
-			log.Printf("could not redirect: %v", err)
+			log.Printf("Server %v :  ClientRequestRPC : could not redirect: %v",serverId , err)
 		}
-		log.Printf("redirected: %s", response.String())
+		log.Printf("Server %v :  ClientRequestRPC : redirected Response %s", serverId,response.String())
 		return response, err
 	}
+	return &pb.ClientResponse{Success: false, Result: "a,b was not added"}, nil // Dummy response
 }

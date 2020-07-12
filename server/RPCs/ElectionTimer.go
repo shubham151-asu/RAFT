@@ -12,7 +12,7 @@ import
 
 var RTT int = 10000
 var MTBF int = 5000
-var ElectionWaitTime int = 10000
+var ElectionWaitTime int = 5000
 
 var waitTime int 
 var TimerReset bool = false
