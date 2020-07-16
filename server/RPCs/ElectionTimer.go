@@ -25,32 +25,32 @@ func (s *server)ResetTimer(){
     rand.Seed(time.Now().UnixNano())
     waitTime = RTT + rand.Intn(MTBF)
     log.Printf("Server %v : ResetTimer : Timer Reset with WaitTime : %v",candidateId,waitTime)
-    mutex.Lock()
+    s.Lock.Lock()
     TimerReset = true
-    mutex.Unlock()
+    s.Lock.Unlock()
 }
 
-func (s *server)ElectionPreventionTimer(){
+func (s *server)HeartBeatTimer(){
     candidateId :=  os.Getenv("CandidateID")
-    log.Printf("Server %v : ElectionPreventionTimer : Timer Reset with WaitTime : %v",candidateId,ElectionWaitTime)
-    mutex.Lock()
+    log.Printf("Server %v : HeartBeatTimer : Timer Reset with WaitTime : %v",candidateId,ElectionWaitTime)
+    s.Lock.Lock()
     ElectionWaitTimerReset = true
-    mutex.Unlock()
+    s.Lock.Unlock()
 }
 
 func (s *server) WaitForTimeToExpire(){
     done := make(chan bool)
     candidateId :=  os.Getenv("CandidateID")
     for {
-        mutex.Lock()
+        s.Lock.Lock()
         TimerReset = false
-        mutex.Unlock()
+        s.Lock.Unlock()
         time.Sleep(time.Duration(waitTime) * time.Millisecond)
-        log.Printf("Server %v : WaitForTimeToExpire : Current State : %v", candidateId, State)
-        if !TimerReset && State==follower{
+        log.Printf("Server %v : WaitForTimeToExpire : Current State : %v", candidateId, s.getState())
+        if !TimerReset && s.getState()==follower{
             log.Printf("Server %v : WaitForTimeToExpire : Timer Expired ",candidateId)
             if s.initCandidateDS() {
-	            log.Printf("Server %v : WaitForTimeToExpire : Candidate Status Granted : %v : Starting Election ",candidateId,State)
+	            log.Printf("Server %v : WaitForTimeToExpire : Candidate Status Granted : %v : Starting Election ",candidateId,s.getState())
                 go s.StartElection(done)
                 <-done
             } else {
@@ -71,10 +71,10 @@ func (s *server) StartElection(done chan bool) {
 	var mu sync.Mutex
 	cond := sync.NewCond(&mu)
 	log.Printf("Server %v : StartElection : Election Started ",candidateId)
-	s.currentTerm += 1
+	s.setCurrentTerm(s.getCurrentTerm() + 1)
 	s.votedFor = int64(CandidateID)
-	log.Printf("Server %v : StartElection : Current State : %v", candidateId, State)
-	if State==candidate {
+	log.Printf("Server %v : StartElection : Current State : %v", candidateId, s.getState())
+	if s.getState() == candidate {
         for i := 1 ; i<=REPLICAS ; i++ {
             serverId := strconv.Itoa(i)
             address := "server"+ serverId + ":"+os.Getenv("PORT")+serverId
@@ -98,10 +98,10 @@ func (s *server) StartElection(done chan bool) {
             cond.Wait()
         }
         log.Printf("Server %v : StartElection : Votes Received : %v",candidateId,count)
-        if count >= ((REPLICAS/2)+1) && !TimerReset && State==candidate{
-            log.Printf("Server %v : StartElection : Election for Term : %v won by Server : %v ",candidateId,s.currentTerm,candidateId)
+        if count >= ((REPLICAS/2)+1) && !TimerReset && s.getState()==candidate{
+            log.Printf("Server %v : StartElection : Election for Term : %v won by Server : %v ",candidateId,s.getCurrentTerm(),candidateId)
             if s.initLeaderDS() {
-                log.Printf("Server %v : StartElection : Leader Status Granted : %v Sending HeartBeat ",candidateId,State)
+                log.Printf("Server %v : StartElection : Leader Status Granted : %v Sending HeartBeat ",candidateId,s.getState())
                 go s.HeartBeat()
             } else {
                 log.Printf("Server %v : StartElection : Unable to start Heartbeat",candidateId)
@@ -111,7 +111,7 @@ func (s *server) StartElection(done chan bool) {
         }
         mu.Unlock()
     } else {
-        log.Printf("Server %v : StartElection : No Longer a Candidate State : Current State : %v ",candidateId,State)
+        log.Printf("Server %v : StartElection : No Longer a Candidate State : Current State : %v ",candidateId,s.getState())
     }
     done <- true
 }

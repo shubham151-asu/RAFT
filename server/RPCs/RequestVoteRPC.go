@@ -23,34 +23,34 @@ func (s *server) RequestVoteRPC(ctx context.Context, in *pb.RequestVote) (*pb.Re
 	//TODO Add code to response for RequestVote
 
 	switch {
-	    case s.currentTerm>term:
+	    case s.getCurrentTerm()>term:
 	        return &pb.ResponseVote{Term:s.currentTerm,VoteGranted:false}, nil
-	    case s.lastLogTerm>= lastLogTerm && s.lastLogIndex>=lastLogIndex:
-	        if s.votedFor==0 {
-	            s.votedFor = candidateId
+	    case s.verifyLastLogTermIndex(lastLogIndex,lastLogTerm):
+	        if s.votedFor==0 {  // Need to verify from persistance DB
+	            s.votedFor = candidateId  // Need to add to persistance
 	            log.Printf("Server %v : RequestVoteRPC :vote granted to %v for term %v",serverId, candidateId,s.currentTerm) // Do Additional things
-	            return &pb.ResponseVote{Term:s.currentTerm,VoteGranted:true}, nil
+	            return &pb.ResponseVote{Term:s.getCurrentTerm(),VoteGranted:true}, nil
 	        } else {
 	            switch {
-	               case s.currentTerm==term:
+	               case s.getCurrentTerm()==term:
 	                   log.Printf("Server %v : RequestVoteRPC : vote not granted to candidate %v as already voted to %v for the current term : %v",serverId, candidateId,s.votedFor,s.currentTerm) // Do Additional things
-	                   return &pb.ResponseVote{Term:s.currentTerm,VoteGranted:false}, nil
-	               case term>s.currentTerm:
+	                   return &pb.ResponseVote{Term:s.getCurrentTerm(),VoteGranted:false}, nil
+	               case term>s.getCurrentTerm():
 	                   s.votedFor = candidateId
-	                   s.currentTerm = term
+	                   s.setCurrentTerm(term)
 	                   log.Printf("Server %v : RequestVoteRPC : vote granted to %v for term %v",serverId, candidateId,s.currentTerm) // Do Additional things
-	                   return &pb.ResponseVote{Term:s.currentTerm,VoteGranted:true}, nil
+	                   return &pb.ResponseVote{Term:s.getCurrentTerm(),VoteGranted:true}, nil
 	            }
 	        }
     }
-    return &pb.ResponseVote{Term:s.currentTerm,VoteGranted:false}, nil
+    return &pb.ResponseVote{Term:s.getCurrentTerm(),VoteGranted:false}, nil
 }
 
 func (s *server) VoteRPC(address string) (bool){
     response := false
     serverId :=  os.Getenv("CandidateID")
-    log.Printf("Server %v : VoteRPC : Current State : %v", serverId, State)
-    if State==candidate {
+    log.Printf("Server %v : VoteRPC : Current State : %v", serverId, s.getState())
+    if s.getState()==candidate {
         conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
         if err != nil {
              log.Printf("Server %v : VoteRPC : could not connect : error %v", serverId, err)
@@ -69,7 +69,7 @@ func (s *server) VoteRPC(address string) (bool){
         return response.GetVoteGranted()
         // TODO Update server currentTerm in all responses
     } else {
-        log.Printf("Server %v : VoteRPC : No Longer a Candidate State : Current State : %v",serverId,State)
+        log.Printf("Server %v : VoteRPC : No Longer a Candidate State : Current State : %v",serverId,s.getState())
     }
 	return response
 }

@@ -19,27 +19,29 @@ func (s *server) RequestAppendRPC(ctx context.Context, in *pb.RequestAppend) (*p
 	log.Printf("Server %v : RequestAppendRPC : Received prevLogIndex : %v", serverID, in.GetPrevLogIndex())
 	log.Printf("Server %v : RequestAppendRPC : Received prevLogTerm : %v", serverID, in.GetPrevLogTerm())
 	// TODO reset timer
+
 	term := in.GetTerm()
-	if in.GetTerm() < s.currentTerm {
-		return &pb.ResponseAppend{Term: s.currentTerm, Success: false}, nil
+	if in.GetTerm() < s.getCurrentTerm() {
+		return &pb.ResponseAppend{Term: s.getCurrentTerm(), Success: false}, nil
 	}
-	log.Printf("Server %v : RequestAppendRPC : Length of log : %v", serverID , len(s.log))
+
+	log.Printf("Server %v : RequestAppendRPC : Length of log : %v", serverID , len(s.log))  // Need to add protection here
 	if in.GetPrevLogIndex() >= 0 && (int64(len(s.log)-1) < in.GetPrevLogIndex() || s.log[in.GetPrevLogIndex()].Term != in.GetPrevLogTerm()) {
 		return &pb.ResponseAppend{Term: s.currentTerm, Success: false}, nil
 	}
 	s.ResetTimer() // Once correct has been verified : Reset your Election Timer
 	s.initFollowerDS() // Once correct term has been verified : Go to Follower State no Matter What was previous State was
     s.currentTerm = term // Updating currentTerm to what sent by leader
-	s.log = s.log[0 : in.GetPrevLogIndex()+1]
+	s.log = s.log[0 : in.GetPrevLogIndex()+1] // Need to add protection here
 	for i, entry := range in.GetEntries() {
 		//TODO append log entry for worker
 		log.Printf("Server %v : RequestAppendRPC : Received entry : %v at index %v", serverID, entry, i)
-		s.log = append(s.log, entry)
+		s.log = append(s.log, entry) // Here as well
 	}
 	log.Printf("Server %v : RequestAppendRPC : Received leaderCommit : %v", serverID, in.GetLeaderCommit())
 	s.leaderId = in.GetLeaderId()  // Need to protect this part
-	if in.GetLeaderCommit() > s.commitIndex {
-		s.commitIndex = int64(math.Min(float64(in.GetLeaderCommit()), float64(len(s.log)-1)))
+	if in.GetLeaderCommit() > s.getCommitIndex() {
+		s.setCommitIndex(int64(math.Min(float64(in.GetLeaderCommit()), float64(len(s.log)-1)))) // Need to add protection here
 	}
 	//TODO commitIndex
 	return &pb.ResponseAppend{Term: s.currentTerm, Success: true}, nil
@@ -49,7 +51,7 @@ func (s *server) AppendRPC(address string, serverID int64) bool {
     response := false
 	leaderId, _ := strconv.Atoi(os.Getenv("CandidateID"))
 	leaderID := int64(leaderId)
-	if State==leader {
+	if s.getState() == leader {
         conn, err := grpc.Dial(address, grpc.WithInsecure())
         if err != nil {
             log.Printf("Server %v : AppendRPC : did not connect: %v", leaderId , err)
@@ -59,7 +61,7 @@ func (s *server) AppendRPC(address string, serverID int64) bool {
         c := pb.NewRPCServiceClient(conn)
         ctx, cancel := context.WithTimeout(context.Background(), time.Second)
         defer cancel()
-        logLength := len(s.log)
+        logLength := len(s.log) // Need to add protection here
         nextLogIndex := s.nextIndex[serverID-1]
 
         for nextLogIndex >= 0 {
@@ -93,7 +95,7 @@ func (s *server) AppendRPC(address string, serverID int64) bool {
             }
 	    }
 	} else {
-	    log.Printf("Server %v : AppendRPC : No Longer a leader : Current State",leaderId,State)
+	    log.Printf("Server %v : AppendRPC : No Longer a leader : Current State",leaderId,s.getState())
 	}
 	// TODO update leader data for each worker
 
@@ -113,8 +115,8 @@ func (s* server) HeartBeat() {
 	    finished := 1 // One vote count due to self
 	    var mu sync.Mutex
 	    cond := sync.NewCond(&mu)
-	    log.Printf("Server %v : HeartBeat : Current State : %v", leaderId, State)
-        if !ElectionWaitTimerReset && State==leader{
+	    log.Printf("Server %v : HeartBeat : Current State : %v", leaderId, s.getState())
+        if !ElectionWaitTimerReset && s.getState()==leader{
             for i := 1; i <= REPLICAS; i++ {
                     serverId := strconv.Itoa(i)
 			        address := "server" + serverId + ":" + os.Getenv("PORT") + serverId
@@ -148,7 +150,8 @@ func (s* server) HeartBeat() {
         mutex.Unlock()
         time.Sleep(time.Duration(ElectionWaitTime) * time.Millisecond)
         mutex.Lock()
-        if State!=leader{
+        if s.getState()!=leader{
+            log.Printf("Server %v : HeartBeat : No longer a leader : Step back from HeartBeat ",leaderId)
             mutex.Unlock()
             break
             }

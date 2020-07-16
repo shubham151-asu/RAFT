@@ -15,17 +15,17 @@ import (
 func (s *server) ClientRequestRPC(ctx context.Context, in *pb.ClientRequest) (*pb.ClientResponse, error) {
     serverId :=  os.Getenv("CandidateID")
 	log.Printf("Server %v :  ClientRequestRPC : Received Command : %v", serverId , in.GetCommand())
-	log.Printf("Server %v :  ClientRequestRPC : State", serverId, State)
+	log.Printf("Server %v :  ClientRequestRPC : State : %v", serverId, s.getState())
     NUMREPLICAS := os.Getenv("NUMREPLICAS")
 	REPLICAS, _ := strconv.Atoi(NUMREPLICAS)
 	if s.leaderId == 0 {
 	    log.Printf("Server %v :  ClientRequestRPC : No Leader Elected : Come back later", serverId)
 		return nil, errors.New("Something went wrong, please try again")
-	} else if State==leader {
-	    s.ElectionPreventionTimer()
+	} else if s.getState()==leader {
+	    s.HeartBeatTimer()
 		log.Printf("Server %v :  ClientRequestRPC : Appending ClientRequest to Logs : Term : %v : Command : %v", serverId,s.currentTerm,in.GetCommand())
 		// Here All server object data will be manipulated
-		s.log = append(s.log, &pb.RequestAppendLogEntry{Command: in.GetCommand(), Term: s.currentTerm})
+		s.log = append(s.log, &pb.RequestAppendLogEntry{Command: in.GetCommand(), Term: s.currentTerm}) // Safety
 		log.Printf("Server %v :  ClientRequestRPC : length of logs : %v", serverId , len(s.log))
 		count := 1 // Vote self
 	    finished := 1 // One vote count due to self
@@ -39,7 +39,7 @@ func (s *server) ClientRequestRPC(ctx context.Context, in *pb.ClientRequest) (*p
 				continue
 			}
 			log.Printf("Server %v :  ClientRequestRPC : Address of the server:%v", serverId , address)
-			if int64(len(s.log)) > s.nextIndex[i-1] && State==leader {
+			if int64(len(s.log)) > s.nextIndex[i-1] && s.getState()==leader {
 				log.Printf("Server %v :  ClientRequestRPC : Calling AppendEntry", serverId)
 				go func(address string,id int64) {
                     success := s.AppendRPC(address,id)
@@ -58,9 +58,9 @@ func (s *server) ClientRequestRPC(ctx context.Context, in *pb.ClientRequest) (*p
             cond.Wait()
         }
         log.Printf("Server %v : ClientRequestRPC : Success Count : %v",serverId,count)
-        if count >= ((REPLICAS/2)+1) && State==leader {
+        if count >= ((REPLICAS/2)+1) && s.getState()==leader {
            log.Printf("Server %v : ClientRequestRPC :  Majority Response received : Committing Entry ",serverId)
-           s.commitIndex++
+           s.IncrementCommitIndex(1) // Verify this Increment : Whether one or more than 1
            return &pb.ClientResponse{Success: true, Result: "a,b added"}, nil //
 		} else {
 			return &pb.ClientResponse{Success: false, Result: "a,b was not added"}, nil
