@@ -268,22 +268,54 @@ func (s *server) insertLog(logIndex1 int, term1 int, command1 string) {
 		log.Printf("insertLog --> transaction commited")
 	}
 
-	statement, err = s.db.Prepare("SELECT term,command FROM logs WHERE logIndex = ?")
-	rows, err := statement.Query(logIndex1)
-	if err != nil {
-		log.Fatal("err in getLog : ", err)
-	}
-	var term int
-	var command string
-	if rows.Next() {
-		rows.Scan(&term, &command)
-		log.Printf("insertLog --> lastLogTerm:" + strconv.Itoa(term) + "  command: " + command)
-	}
-	log.Printf("insertLog --> return")
+	// statement, err = s.db.Prepare("SELECT term,command FROM logs WHERE logIndex = ?")
+	// rows, err := statement.Query(logIndex1)
+	// if err != nil {
+	// 	log.Fatal("err in getLog : ", err)
+	// }
+	// var term int
+	// var command string
+	// if rows.Next() {
+	// 	rows.Scan(&term, &command)
+	// 	log.Printf("insertLog --> lastLogTerm:" + strconv.Itoa(term) + "  command: " + command)
+	// }
+	// log.Printf("insertLog --> return")
 
 	// LastInsertId, err := res.LastInsertId()
 	// RowsAffected, err := res.RowsAffected()
 	// log.Printf("LastInsertId : %v  RowsAffected: %v", LastInsertId, RowsAffected)
+}
+func (s *server) insertBatchLog(lastLogIndex int, logList []*pb.RequestAppendLogEntry) {
+	//log.Printf("insertLog --> loglist:" + logList)
+	tx, err := s.db.Begin()
+	log.Printf("insertLog --> transaction begin")
+
+	if err != nil {
+		log.Fatal("err : ", err)
+	}
+	statement, err := s.db.Prepare("INSERT INTO logs (logIndex,term, command) VALUES (?, ?,?)")
+	log.Printf("insertLog --> statement Prepared")
+
+	if err != nil {
+		log.Fatal("err : ", err)
+	}
+	term := logList[0].Term
+	for i, logEntry := range logList {
+		lastLogIndex++
+		_, err = tx.Stmt(statement).Exec(lastLogIndex, logEntry.Term, logEntry.Command)
+		term = logEntry.Term
+		log.Printf("nsertBatchLog --> Exec logEntry : %v at index %v", logEntry, lastLogIndex)
+	}
+	log.Printf("insertLog --> statement Exec")
+
+	if err != nil {
+		log.Printf("doing rollback")
+		tx.Rollback()
+	} else {
+		tx.Commit()
+		s.setLastLog(int64(lastLogIndex), term)
+		log.Printf("insertLog --> transaction commited")
+	}
 }
 func (s *server) getLogList(startLogIndex int, endLogIndex int) []*pb.RequestAppendLogEntry { //inclusive
 	log.Printf("getLogList --> startLogIndex:" + strconv.Itoa(startLogIndex) + " endLogIndex:" + strconv.Itoa(endLogIndex))
@@ -294,15 +326,13 @@ func (s *server) getLogList(startLogIndex int, endLogIndex int) []*pb.RequestApp
 		log.Printf("err in getLogList : ", err)
 		return response
 	}
-	if rows.Next() {
+	for rows.Next() {
 		var logIndex int
 		var term int
 		var command string
 		rows.Scan(&logIndex, &term, &command)
 		log.Printf("lastLogIndex : " + strconv.Itoa(logIndex) + "     lastLogTerm:" + strconv.Itoa(term) + "  command: " + command)
 		response = append(response, &pb.RequestAppendLogEntry{Command: command, Term: int64(term)})
-	} else {
-		log.Printf(" getLogList --> No data")
 	}
 	return response
 }
@@ -318,7 +348,7 @@ func (s *server) getLog(logIndex int) *pb.RequestAppendLogEntry {
 	if rows.Next() {
 		rows.Scan(&term, &command)
 		log.Printf("getLog --> lastLogTerm:" + strconv.Itoa(term) + "  command: " + command)
+		return &pb.RequestAppendLogEntry{Command: command, Term: int64(term)}
 	}
-	return &pb.RequestAppendLogEntry{Command: command, Term: int64(term)}
-
+	return nil
 }

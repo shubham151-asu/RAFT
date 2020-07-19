@@ -35,15 +35,19 @@ func (s *server) RequestAppendRPC(ctx context.Context, in *pb.RequestAppend) (*p
 	s.initFollowerDS()   // Once correct term has been verified : Go to Follower State no Matter What was previous State was
 	s.currentTerm = term // Updating currentTerm to what sent by leader
 	//s.log = s.log[0 : in.GetPrevLogIndex()+1] // Need to add protection here
-	for i, entry := range in.GetEntries() {
-		//TODO append log entry for worker
-		log.Printf("Server %v : RequestAppendRPC : Received entry : %v at index %v", serverID, entry, i)
-		//s.log = append(s.log, entry) // Here as well
-		log.Printf("term : %v    command : %v", entry.Term, entry.Command)
-		lastLogIndex++
-		s.insertLog(int(lastLogIndex), int(entry.Term), entry.Command)
-		s.setLastLog(lastLogIndex, entry.Term)
+	// for i, entry := range in.GetEntries() {
+	// 	//TODO append log entry for worker
+	// 	log.Printf("Server %v : RequestAppendRPC : Received entry : %v at index %v", serverID, entry, i)
+	// 	//s.log = append(s.log, entry) // Here as well
+	// 	log.Printf("term : %v    command : %v", entry.Term, entry.Command)
+	// 	lastLogIndex++
+	// 	s.insertLog(int(lastLogIndex), int(entry.Term), entry.Command)
+	// 	s.setLastLog(lastLogIndex, entry.Term)
+	// }
+	if len(in.GetEntries()) > 0 {
+		s.insertBatchLog(int(lastLogIndex), in.GetEntries())
 	}
+
 	log.Printf("Server %v : RequestAppendRPC : Received leaderCommit : %v", serverID, in.GetLeaderCommit())
 	s.leaderId = in.GetLeaderId() // Need to protect this part
 	if in.GetLeaderCommit() > s.getCommitIndex() {
