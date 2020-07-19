@@ -19,6 +19,7 @@ func (s *server) RequestAppendRPC(ctx context.Context, in *pb.RequestAppend) (*p
 	log.Printf("Server %v : RequestAppendRPC : Received leaderId : %v", serverID, in.GetLeaderId())
 	log.Printf("Server %v : RequestAppendRPC : Received prevLogIndex : %v", serverID, in.GetPrevLogIndex())
 	log.Printf("Server %v : RequestAppendRPC : Received prevLogTerm : %v", serverID, in.GetPrevLogTerm())
+	log.Printf("Server %v : RequestAppendRPC : Received GetEntries : %v", serverID, in.GetEntries())
 	// TODO reset timer
 
 	term := in.GetTerm()

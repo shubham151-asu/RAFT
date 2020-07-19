@@ -192,7 +192,7 @@ func RPCInit() bool {
 	return true
 }
 func (s *server) DBInit() {
-	db, err := sql.Open("sqlite3", "./logger.db") //TODO rename db
+	db, err := sql.Open("sqlite3", "./logger.db?_journal_mode=WAL&_synchronous=NORMAL") //TODO rename db
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -246,20 +246,26 @@ func (s *server) createDBStructure() {
 func (s *server) insertLog(logIndex1 int, term1 int, command1 string) {
 	log.Printf("insertLog --> logIndex:" + strconv.Itoa(int(logIndex1)) + " term:" + strconv.Itoa(int(term1)) + " Command: " + command1)
 	tx, err := s.db.Begin()
+	log.Printf("insertLog --> transaction begin")
+
 	if err != nil {
 		log.Fatal("err : ", err)
 	}
 	statement, err := s.db.Prepare("INSERT INTO logs (logIndex,term, command) VALUES (?, ?,?)")
+	log.Printf("insertLog --> statement Prepared")
+
 	if err != nil {
 		log.Fatal("err : ", err)
 	}
 	_, err = tx.Stmt(statement).Exec(logIndex1, term1, command1)
+	log.Printf("insertLog --> statement Exec")
+
 	if err != nil {
 		log.Printf("doing rollback")
 		tx.Rollback()
 	} else {
 		tx.Commit()
-		log.Printf("transaction commited")
+		log.Printf("insertLog --> transaction commited")
 	}
 
 	statement, err = s.db.Prepare("SELECT term,command FROM logs WHERE logIndex = ?")
@@ -271,15 +277,16 @@ func (s *server) insertLog(logIndex1 int, term1 int, command1 string) {
 	var command string
 	if rows.Next() {
 		rows.Scan(&term, &command)
-		log.Printf("lastLogTerm:" + strconv.Itoa(term) + "  command: " + command)
+		log.Printf("insertLog --> lastLogTerm:" + strconv.Itoa(term) + "  command: " + command)
 	}
+	log.Printf("insertLog --> return")
 
 	// LastInsertId, err := res.LastInsertId()
 	// RowsAffected, err := res.RowsAffected()
 	// log.Printf("LastInsertId : %v  RowsAffected: %v", LastInsertId, RowsAffected)
 }
 func (s *server) getLogList(startLogIndex int, endLogIndex int) []*pb.RequestAppendLogEntry { //inclusive
-	log.Printf("startLogIndex:" + strconv.Itoa(startLogIndex) + " endLogIndex:" + strconv.Itoa(endLogIndex))
+	log.Printf("getLogList --> startLogIndex:" + strconv.Itoa(startLogIndex) + " endLogIndex:" + strconv.Itoa(endLogIndex))
 	statement, err := s.db.Prepare("SELECT logIndex,term,command FROM logs WHERE logs.logIndex >= ? AND logs.logIndex <= ?")
 	rows, err := statement.Query(startLogIndex, endLogIndex)
 	var response []*pb.RequestAppendLogEntry
@@ -295,7 +302,7 @@ func (s *server) getLogList(startLogIndex int, endLogIndex int) []*pb.RequestApp
 		log.Printf("lastLogIndex : " + strconv.Itoa(logIndex) + "     lastLogTerm:" + strconv.Itoa(term) + "  command: " + command)
 		response = append(response, &pb.RequestAppendLogEntry{Command: command, Term: int64(term)})
 	} else {
-		log.Printf("No data")
+		log.Printf(" getLogList --> No data")
 	}
 	return response
 }
@@ -310,7 +317,7 @@ func (s *server) getLog(logIndex int) *pb.RequestAppendLogEntry {
 	var command string
 	if rows.Next() {
 		rows.Scan(&term, &command)
-		log.Printf("lastLogTerm:" + strconv.Itoa(term) + "  command: " + command)
+		log.Printf("getLog --> lastLogTerm:" + strconv.Itoa(term) + "  command: " + command)
 	}
 	return &pb.RequestAppendLogEntry{Command: command, Term: int64(term)}
 
