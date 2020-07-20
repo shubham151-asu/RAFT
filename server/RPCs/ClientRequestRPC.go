@@ -28,6 +28,7 @@ func (s *server) ClientRequestRPC(ctx context.Context, in *pb.ClientRequest) (*p
 		//s.log = append(s.log, &pb.RequestAppendLogEntry{Command: in.GetCommand(), Term: s.currentTerm}) // Safety
 		lastLogIndex, _ := s.getLastLog()
 		lastLogIndex++
+		//log.Printf("Server %v :  ClientRequestRPC : Incremented lastLogIndex : %v",serverId,lastLogIndex)
 		s.db.InsertLog(int(lastLogIndex), int(s.getCurrentTerm()), in.GetCommand())
 		s.setLastLog(lastLogIndex, s.getCurrentTerm())
 		log.Printf("Server %v :  ClientRequestRPC : length of logs : %v", serverId, lastLogIndex+1)
