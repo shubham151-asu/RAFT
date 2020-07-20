@@ -45,7 +45,7 @@ func (s *server) RequestAppendRPC(ctx context.Context, in *pb.RequestAppend) (*p
 	// 	s.setLastLog(lastLogIndex, entry.Term)
 	// }
 	if len(in.GetEntries()) > 0 {
-		s.insertBatchLog(int(lastLogIndex), in.GetEntries())
+		s.lastLogIndex,s.currentTerm = s.db.InsertBatchLog(int(lastLogIndex), in.GetEntries())
 	}
 
 	log.Printf("Server %v : RequestAppendRPC : Received leaderCommit : %v", serverID, in.GetLeaderCommit())
@@ -75,18 +75,18 @@ func (s *server) AppendRPC(address string, serverID int64) bool {
 		//logLength := len(s.log) // Need to add protection here
 		nextLogIndex := s.nextIndex[serverID-1]
 		lastLogIndex, _ := s.getLastLog()
-		entryList := s.getLogList(int(nextLogIndex), int(lastLogIndex))
+		entryList := s.db.GetLogList(int(nextLogIndex), int(lastLogIndex))
 		for nextLogIndex >= 0 {
 			log.Printf("Server %v : AppendRPC : nextLogIndex : %v", leaderId, nextLogIndex)
 			prevLogIndex := nextLogIndex - 1
 			log.Printf("Server %v : AppendRPC : prevLogIndex : %v", leaderId, prevLogIndex)
 			var prevLogTerm int64
 			if prevLogIndex >= 0 {
-				prevLogTerm = s.getLog(int(prevLogIndex)).Term
+				prevLogTerm = s.db.GetLog(int(prevLogIndex)).Term
 			}
 			if tryAgain {
 				lastLogIndex, _ = s.getLastLog()
-				entryList = s.getLogList(int(nextLogIndex), int(lastLogIndex))
+				entryList = s.db.GetLogList(int(nextLogIndex), int(lastLogIndex))
 			}
 			response, err := c.RequestAppendRPC(ctx, &pb.RequestAppend{Term: s.currentTerm, LeaderId: leaderID,
 				PrevLogIndex: prevLogIndex, PrevLogTerm: prevLogTerm,
