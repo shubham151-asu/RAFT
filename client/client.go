@@ -24,9 +24,9 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	response, err := c.ClientRequestRPC(ctx, &pb.ClientRequest{Command: "add a b"})
+	response, err := c.ClientRequestRPC(ctx, &pb.ClientRequest{Command: "get", Key: "x", Value: "5"})
 	if err != nil {
-		log.Fatalf("could not greet: %v", err)
+		log.Fatalf("Error: %v", err)
 	}
-	log.Printf("Greeting: %s", response.String())
+	log.Printf("Response: %s", response.String())
 }

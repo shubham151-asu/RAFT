@@ -7,8 +7,9 @@ import (
 	"strconv"
 	"sync"
 	"sync/atomic"
-    "raftAlgo.com/service/server/DB"
+
 	"google.golang.org/grpc"
+	"raftAlgo.com/service/server/DB"
 	pb "raftAlgo.com/service/server/gRPC"
 )
 
@@ -39,9 +40,10 @@ type server struct {
 	nextIndex    []int64
 	matchIndex   []int64
 	//log          []*pb.RequestAppendLogEntry
-	leaderId int64
-	Lock     sync.Mutex
-	db       DB.Conn
+	leaderId     int64
+	Lock         sync.Mutex
+	db           DB.Conn
+	stateMachine map[string]string
 }
 
 func (s *server) getState() int32 {
@@ -122,6 +124,7 @@ func (s *server) initServerDS() {
 	s.matchIndex = make([]int64, REPLICAS)
 	s.leaderId = 0
 	s.state = follower
+	s.stateMachine = make(map[string]string)
 }
 
 func (s *server) initLeaderDS() bool {
@@ -189,11 +192,9 @@ func RPCInit() bool {
 	return true
 }
 
-
 func (s *server) DBInit() {
 	s.db.DBInit()
-	lastLogIndex,lastLogTerm := s.db.CreateDBStructure()
+	lastLogIndex, lastLogTerm := s.db.CreateDBStructure()
 	s.lastLogTerm = lastLogTerm
 	s.lastLogIndex = lastLogIndex
 }
-

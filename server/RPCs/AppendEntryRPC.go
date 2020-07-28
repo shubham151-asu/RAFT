@@ -45,8 +45,8 @@ func (s *server) RequestAppendRPC(ctx context.Context, in *pb.RequestAppend) (*p
 	// 	s.setLastLog(lastLogIndex, entry.Term)
 	// }
 	if len(in.GetEntries()) > 0 {
-		lastLogIndex,lastLogTerm = s.db.InsertBatchLog(int(lastLogIndex), in.GetEntries())
-		s.setLastLog(lastLogIndex,lastLogTerm)
+		lastLogIndex, lastLogTerm = s.db.InsertBatchLog(lastLogIndex, in.GetEntries())
+		s.setLastLog(lastLogIndex, lastLogTerm)
 	}
 	log.Printf("Server %v : RequestAppendRPC : Received leaderCommit : %v", serverID, in.GetLeaderCommit())
 	s.leaderId = in.GetLeaderId() // Need to protect this part
@@ -95,20 +95,20 @@ func (s *server) AppendRPC(address string, serverID int64) bool {
 				log.Printf("Server %v : AppendRPC : did not connect: %v", leaderId, err)
 				return false
 			}
-			log.Printf("Server %v : AppendRPC : Response Received from server : %v : %v", leaderId ,serverID, response.String())
+			log.Printf("Server %v : AppendRPC : Response Received from server : %v : %v", leaderId, serverID, response.String())
 			if !response.GetSuccess() {
-			    log.Printf("Server %v : AppendRPC : Attempt Failed ",leaderId)
+				log.Printf("Server %v : AppendRPC : Attempt Failed ", leaderId)
 				if response.GetTerm() > s.currentTerm {
 					// WHAT TO DO WHEN FOLLOWER'S TERM IS HIGHER THAN LEADER?
 					return false
 				} else {
-				    log.Printf("Server %v : AppendRPC : Attempting to Retry ",leaderId)
+					log.Printf("Server %v : AppendRPC : Attempting to Retry ", leaderId)
 					tryAgain = true
 					nextLogIndex--
 					s.nextIndex[serverID-1] = nextLogIndex
 				}
 			} else {
-			    log.Printf("Server %v : AppendRPC : Attempt Success",leaderId)
+				log.Printf("Server %v : AppendRPC : Attempt Success", leaderId)
 				s.nextIndex[serverID-1] = int64(lastLogIndex + 1)
 				return true
 			}

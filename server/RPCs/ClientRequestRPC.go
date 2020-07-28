@@ -6,16 +6,21 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
+
 	"google.golang.org/grpc"
 	pb "raftAlgo.com/service/server/gRPC"
 )
 
 func (s *server) ClientRequestRPC(ctx context.Context, in *pb.ClientRequest) (*pb.ClientResponse, error) {
 	serverId := os.Getenv("CandidateID")
-	log.Printf("Server %v :  ClientRequestRPC : Received Command : %v", serverId, in.GetCommand())
+	log.Printf("Server %v :  ClientRequestRPC : Received Command : %v Key : %v Value : %v", serverId, in.GetCommand(), in.GetKey(), in.GetValue())
 	log.Printf("Server %v :  ClientRequestRPC : State : %v", serverId, s.getState())
+	if !strings.EqualFold(in.GetCommand(), "put") && !strings.EqualFold(in.GetCommand(), "get") {
+		return &pb.ClientResponse{Success: false, Result: "", LeaderId: s.leaderId}, errors.New("Wrong command, only Put and Get allowed")
+	}
 	NUMREPLICAS := os.Getenv("NUMREPLICAS")
 	REPLICAS, _ := strconv.Atoi(NUMREPLICAS)
 	if s.leaderId == 0 {
@@ -23,13 +28,13 @@ func (s *server) ClientRequestRPC(ctx context.Context, in *pb.ClientRequest) (*p
 		return nil, errors.New("Something went wrong, please try again")
 	} else if s.getState() == leader {
 		s.HeartBeatTimer()
-		log.Printf("Server %v :  ClientRequestRPC : Appending ClientRequest to Logs : Term : %v : Command : %v", serverId, s.getCurrentTerm(), in.GetCommand())
-		// Here All server object data will be manipulated
+		log.Printf("Server %v :  ClientRequestRPC : Appending ClientRequest to Logs : Term : %v : Command : %v Key : %v Value : %v", serverId, s.getCurrentTerm(), in.GetCommand(), in.GetKey(), in.GetValue())
+		// Here All leader object data will be manipulated
 		//s.log = append(s.log, &pb.RequestAppendLogEntry{Command: in.GetCommand(), Term: s.currentTerm}) // Safety
 		lastLogIndex, _ := s.getLastLog()
 		lastLogIndex++
 		//log.Printf("Server %v :  ClientRequestRPC : Incremented lastLogIndex : %v",serverId,lastLogIndex)
-		s.db.InsertLog(int(lastLogIndex), int(s.getCurrentTerm()), in.GetCommand())
+		s.db.InsertLog(int(lastLogIndex), int(s.getCurrentTerm()), in.GetCommand(), in.GetKey(), in.GetValue())
 		s.setLastLog(lastLogIndex, s.getCurrentTerm())
 		log.Printf("Server %v :  ClientRequestRPC : length of logs : %v", serverId, lastLogIndex+1)
 		count := 1    // Vote self
@@ -64,11 +69,23 @@ func (s *server) ClientRequestRPC(ctx context.Context, in *pb.ClientRequest) (*p
 		}
 		log.Printf("Server %v : ClientRequestRPC : Success Count : %v", serverId, count)
 		if count >= ((REPLICAS/2)+1) && s.getState() == leader {
-			log.Printf("Server %v : ClientRequestRPC :  Majority Response received : Committing Entry ", serverId)
-			s.IncrementCommitIndex(1)                                          // Verify this Increment : Whether one or more than 1
-			return &pb.ClientResponse{Success: true, Result: "a,b added"}, nil //
+			if lastLogIndex > s.getCommitIndex() {
+				s.setCommitIndex(lastLogIndex) // Verify this Increment : Whether one or more than 1
+			}
+			if strings.EqualFold(in.GetCommand(), "put") {
+				s.stateMachine[in.GetKey()] = in.GetValue()
+				log.Printf("Server %v : ClientRequestRPC :  Majority Response received : Committing Entry ", serverId)
+				return &pb.ClientResponse{Success: true, Result: "", LeaderId: s.leaderId}, nil
+			} else if strings.EqualFold(in.GetCommand(), "get") {
+				if _, exist := s.stateMachine[in.GetKey()]; exist {
+					return &pb.ClientResponse{Success: true, Result: s.stateMachine[in.GetKey()], LeaderId: s.leaderId}, nil
+				} else {
+					return &pb.ClientResponse{Success: false, Result: "", LeaderId: s.leaderId}, errors.New("Data not found")
+				}
+			}
+			return &pb.ClientResponse{Success: false, Result: "", LeaderId: s.leaderId}, errors.New("Something went wrong, please try again")
 		} else {
-			return &pb.ClientResponse{Success: false, Result: "a,b was not added"}, nil
+			return &pb.ClientResponse{Success: false, Result: "", LeaderId: s.leaderId}, errors.New("Something went wrong, please try again")
 		}
 		mu.Unlock()
 	} else {
@@ -84,12 +101,12 @@ func (s *server) ClientRequestRPC(ctx context.Context, in *pb.ClientRequest) (*p
 		c := pb.NewRPCServiceClient(conn)
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
-		response, err := c.ClientRequestRPC(ctx, &pb.ClientRequest{Command: in.GetCommand()})
+		response, err := c.ClientRequestRPC(ctx, &pb.ClientRequest{Command: in.GetCommand(), Key: in.GetKey(), Value: in.GetValue()})
 		if err != nil {
 			log.Printf("Server %v :  ClientRequestRPC : could not redirect: %v", serverId, err)
 		}
 		log.Printf("Server %v :  ClientRequestRPC : redirected Response %s", serverId, response.String())
 		return response, err
 	}
-	return &pb.ClientResponse{Success: false, Result: "a,b was not added"}, nil // Dummy response
+	return &pb.ClientResponse{Success: false, Result: "", LeaderId: s.leaderId}, errors.New("Something went wrong, please try again")
 }

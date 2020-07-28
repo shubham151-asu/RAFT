@@ -19,7 +19,10 @@ message RequestAppend {
 	    int64 prevLogTerm = 4;
 	    message logEntry{
 		string command = 1;
-		int64 term = 2;
+		string key = 2;
+		string value = 3;
+		int64 term = 4;
+		int64 logIndex = 5;
 	    }
 	    repeated logEntry entries = 5;
 	    int64 leaderCommit = 6;
@@ -33,6 +36,7 @@ message ResponseAppend {
 message ClientResponse {
 	bool success = 1;
     string result = 2;
+	int64 leaderId = 3;
 }
 message ClientRequest {
         string command = 1;
