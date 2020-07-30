@@ -62,6 +62,13 @@ func (s *server) setCurrentTerm(term int64) {
 	atomic.StoreInt64(&s.currentTerm, term)
 }
 
+func (s *server) setTermAndVotedFor(term , votedFor int64){
+    s.Lock.Lock()
+    s.db.SetTermAndVotedFor(int(term),int(votedFor))
+    s.currentTerm = term
+    s.Lock.Unlock()
+}
+
 func (s *server) getLastLog() (index, term int64) {
 	s.Lock.Lock()
 	index = s.lastLogIndex

@@ -33,7 +33,7 @@ func (s *server) RequestAppendRPC(ctx context.Context, in *pb.RequestAppend) (*p
 	}
 	s.ResetTimer()       // Once correct has been verified : Reset your Election Timer
 	s.initFollowerDS()   // Once correct term has been verified : Go to Follower State no Matter What was previous State was
-	s.currentTerm = term // Updating currentTerm to what sent by leader
+	s.setCurrentTerm(term) // Updating currentTerm to what sent by leader
 	//s.log = s.log[0 : in.GetPrevLogIndex()+1] // Need to add protection here
 	// for i, entry := range in.GetEntries() {
 	// 	//TODO append log entry for worker

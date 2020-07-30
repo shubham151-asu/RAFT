@@ -6,7 +6,6 @@ import (
 	"math"
 	"os"
 	"strconv"
-
 	_ "github.com/mattn/go-sqlite3"
 	pb "raftAlgo.com/service/server/gRPC"
 )
@@ -35,27 +34,25 @@ func (db *Conn) CreateDBStructure() (lastLogIndex, lastLogTerm int64) {
 
 	statement.Exec()
 	log.Printf("Server %v : CreateDBStructure : Creating Table 'common'", serverId)
-	statement, err = db.DB.Prepare("CREATE TABLE IF NOT EXISTS common (property TEXT PRIMARY KEY, value INTEGER)")
+	statement, err = db.DB.Prepare("CREATE TABLE IF NOT EXISTS common (term INTEGER, votedFor INTEGER)")
 	if err != nil {
 		log.Fatal("err : ", err)
 	}
 	statement.Exec()
 
-	rows, err := db.DB.Query("SELECT property, value FROM common")
+	rows, err := db.DB.Query("SELECT term, votedFor FROM common")
 	if err != nil {
 		log.Fatal("err : ", err)
 	}
-	if !rows.Next() {
-		log.Printf("Server %v : CreateDBStructure : Created Table 'common'", serverId)
-		statement, err = db.DB.Prepare("INSERT INTO common (property, value) VALUES (?, ?)")
-		if err != nil {
-			log.Fatal("err : ", err)
-		}
-		statement.Exec("currentTerm", 0)
-		statement.Exec("votedFor", 0)
-	} else {
+	if rows.Next() {
 		log.Printf("Server %v : CreateDBStructure : Table 'common' exists", serverId)
+		var votedFor int
+		var term int
+		rows.Scan(&term,&votedFor)
+	} else {
+		log.Printf("Server %v : CreateDBStructure : Created Table 'common'", serverId)
 	}
+
 	rows, err = db.DB.Query("SELECT logIndex,term FROM logs WHERE logIndex = (SELECT MAX(logIndex) FROM logs)")
 	if err != nil {
 		log.Fatal("err : ", err)
@@ -75,6 +72,50 @@ func (db *Conn) CreateDBStructure() (lastLogIndex, lastLogTerm int64) {
 	log.Printf("Server %v : CreateDBStructure : lastLogIndex : %v && lastLogTerm : %v", serverId, strconv.Itoa(int(lastLogIndex)), strconv.Itoa(int(lastLogTerm)))
 	return lastLogIndex, lastLogTerm
 }
+
+func (db *Conn) SetTermAndVotedFor(currentTerm,votedFor int){
+    serverId := os.Getenv("CandidateID")
+    log.Printf("Server %v : SetTermAndVotedFor : term : %v &&  votedFor : %v ",serverId,currentTerm,votedFor)
+    tx, err := db.DB.Begin()
+	log.Printf("Server %v : SetTermAndVotedFor : Transaction Begins", serverId)
+	if err != nil {
+		log.Fatal("err : ", err)
+	}
+	statement, err := db.DB.Prepare("INSERT INTO common (term, votedFor) VALUES (?,?)")
+	if err != nil {
+		log.Fatal("err : ", err)
+	}
+	_, err = tx.Stmt(statement).Exec(currentTerm,votedFor)
+	//log.Printf("Server %v : InsertLog : Statement Executed",serverId)
+	if err != nil {
+		log.Printf("Server %v : SetTermAndVotedFor : Transaction Rollback", serverId)
+		tx.Rollback()
+	} else {
+		tx.Commit()
+		log.Printf("Server %v : SetTermAndVotedFor : Transaction Successfully Committed", serverId)
+	}
+}
+
+func (db *Conn) GetVotedFor(currentTerm int64) (votedFor int64){
+    serverId := os.Getenv("CandidateID")
+	log.Printf("Server %v : GetVotedFor : term : %v", serverId, currentTerm)
+	statement, err := db.DB.Prepare("SELECT votedFor FROM common WHERE common.term = ?")
+
+	rows, err := statement.Query(int(currentTerm))
+	if err != nil {
+		log.Fatal("err in getLog : ", err)
+	}
+	
+	if rows.Next() {
+		var votedTo int
+		rows.Scan(&votedTo)
+		log.Printf("Server %v : GetVotedFor : currentTerm : %v  && votedFor : %v", serverId,  currentTerm, votedTo)
+		votedFor = int64(votedTo)
+	}
+	return votedFor
+}
+
+
 func (db *Conn) InsertLog(logIndex int, term int, command string, key string, value string) {
 	serverId := os.Getenv("CandidateID")
 	log.Printf("Server %v : InsertLog : logIndex : %v &&  term : %v && command : %v && key : %v && value : %v ", serverId, strconv.Itoa(int(logIndex)), strconv.Itoa(int(term)), command, key, value)

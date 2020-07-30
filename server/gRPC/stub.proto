@@ -40,9 +40,11 @@ message ClientResponse {
 }
 message ClientRequest {
         string command = 1;
-		string key = 2;
-		string value = 3;
+        string health = 2;
+		string key = 3;
+		string value = 4;
 }
+
 
 service RPCService {
     rpc RequestVoteRPC(RequestVote) returns (ResponseVote) {}

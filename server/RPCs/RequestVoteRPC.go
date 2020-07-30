@@ -26,8 +26,9 @@ func (s *server) RequestVoteRPC(ctx context.Context, in *pb.RequestVote) (*pb.Re
 	    case s.getCurrentTerm()>term:
 	        return &pb.ResponseVote{Term:s.currentTerm,VoteGranted:false}, nil
 	    case s.verifyLastLogTermIndex(lastLogIndex,lastLogTerm):
-	        if s.votedFor==0 {  // Need to verify from persistance DB
-	            s.votedFor = candidateId  // Need to add to persistance
+	        votedFor := s.db.GetVotedFor(term)
+	        if votedFor==0 {  // Need to verify from persistance DB
+	            s.setTermAndVotedFor(term,candidateId) // Need to add to persistance
 	            log.Printf("Server %v : RequestVoteRPC :vote granted to %v for term %v",serverId, candidateId,s.currentTerm) // Do Additional things
 	            return &pb.ResponseVote{Term:s.getCurrentTerm(),VoteGranted:true}, nil
 	        } else {
@@ -36,8 +37,7 @@ func (s *server) RequestVoteRPC(ctx context.Context, in *pb.RequestVote) (*pb.Re
 	                   log.Printf("Server %v : RequestVoteRPC : vote not granted to candidate %v as already voted to %v for the current term : %v",serverId, candidateId,s.votedFor,s.currentTerm) // Do Additional things
 	                   return &pb.ResponseVote{Term:s.getCurrentTerm(),VoteGranted:false}, nil
 	               case term>s.getCurrentTerm():
-	                   s.votedFor = candidateId
-	                   s.setCurrentTerm(term)
+	                   s.setTermAndVotedFor(term,candidateId)
 	                   log.Printf("Server %v : RequestVoteRPC : vote granted to %v for term %v",serverId, candidateId,s.currentTerm) // Do Additional things
 	                   return &pb.ResponseVote{Term:s.getCurrentTerm(),VoteGranted:true}, nil
 	            }
