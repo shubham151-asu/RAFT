@@ -200,6 +200,7 @@ func (db *Conn) InsertBatchLog(lastLogIndex int64, logList []*pb.RequestAppendLo
 	for _, entry := range entryList {
 		entryMap[entry.LogIndex] = entry
 	}
+	lastLogIndexBeforeCommit := lastLogIndex
 	for _, logEntry := range logList {
 		lastLogIndex = logEntry.LogIndex
 		if val, exist := entryMap[logEntry.LogIndex]; exist {
@@ -218,7 +219,8 @@ func (db *Conn) InsertBatchLog(lastLogIndex int64, logList []*pb.RequestAppendLo
 	//log.Printf("Server %v : InsertBatchLog : Statement Executed",serverId)
 
 	if err != nil {
-		log.Printf("doing rollback")
+		log.Printf("Server %v : InsertBatchLog : Transaction Unsuccessful : Doing Rollback", serverId)
+		finalLogIndex = lastLogIndexBeforeCommit
 		tx.Rollback()
 	} else {
 		tx.Commit()
