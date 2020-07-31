@@ -6,8 +6,9 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"time"
 	"sync/atomic"
-
+    "strings"
 	"google.golang.org/grpc"
 	"raftAlgo.com/service/server/DB"
 	pb "raftAlgo.com/service/server/gRPC"
@@ -24,6 +25,7 @@ const (
 	leader    = 2
 	candidate = 1
 	follower  = 0
+	followerWriteWaitTime = 5000
 )
 
 type server struct {
@@ -93,6 +95,7 @@ func (s *server) verifyLastLogTermIndex(index, term int64) bool {
 	s.Lock.Unlock()
 	return response
 }
+
 
 func (s *server) getCommitIndex() int64 {
 	return atomic.LoadInt64(&s.commitIndex)
@@ -179,6 +182,27 @@ func (s *server) initFollowerDS() bool {
 	return response
 }
 
+func (s *server) AddtoStateMachine() {
+    serverId := os.Getenv("CandidateID")
+    for
+    {
+        if s.lastApplied<s.getCommitIndex() && s.getState()==follower{
+            log.Printf("Server %v : AddtoStateMachine : Applying data to State Machine ",serverId)
+	        entryList := s.db.GetLogList(int(s.lastApplied), int(s.getCommitIndex()))
+	        for i:=0 ; i<len(entryList) ; i++ {
+	            command := entryList[i]
+	            if strings.EqualFold(command.GetCommand(), "put") {
+				    s.stateMachine[command.GetKey()] = command.GetValue()
+			    }
+			    s.lastApplied += 1
+			}
+	    }
+	    log.Printf("Server %v : AddtoStateMachine : Not in follower State Going to Sleep ",serverId)
+	    time.Sleep(time.Duration(followerWriteWaitTime) * time.Millisecond)
+    }
+}
+
+
 func RPCInit() bool {
 	port := ":" + os.Getenv("PORT") + os.Getenv("CandidateID")
 	serverId := os.Getenv("CandidateID")
@@ -186,6 +210,7 @@ func RPCInit() bool {
 	serverobj := server{}
 	serverobj.initServerDS()
 	go serverobj.ElectionInit()
+	go serverobj.AddtoStateMachine()
 	serverobj.DBInit()
 	lis, err := net.Listen("tcp", port)
 	if err != nil {

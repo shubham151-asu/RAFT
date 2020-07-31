@@ -18,7 +18,7 @@ func (s *server) ClientRequestRPC(ctx context.Context, in *pb.ClientRequest) (*p
 	serverId := os.Getenv("CandidateID")
 	log.Printf("Server %v :  ClientRequestRPC : Received Command : %v Key : %v Value : %v", serverId, in.GetCommand(), in.GetKey(), in.GetValue())
 	log.Printf("Server %v :  ClientRequestRPC : State : %v", serverId, s.getState())
-	if in.GetHealth() == "Alive"{
+	if strings.EqualFold(in.GetHealth(), "Alive"){
         return &pb.ClientResponse{Success: true, Result: "", LeaderId: s.leaderId}, nil
 	}
 	if !strings.EqualFold(in.GetCommand(), "put") && !strings.EqualFold(in.GetCommand(), "get") {
