@@ -2,6 +2,7 @@ package RPCs
 
 import (
 	"context"
+	"errors"
 	"log"
 	"math"
 	"os"
@@ -31,8 +32,8 @@ func (s *server) RequestAppendRPC(ctx context.Context, in *pb.RequestAppend) (*p
 	if in.GetPrevLogIndex() >= 0 && (lastLogIndex < in.GetPrevLogIndex() || lastLogTerm != in.GetPrevLogTerm()) {
 		return &pb.ResponseAppend{Term: s.currentTerm, Success: false}, nil
 	}
-	s.ResetTimer()       // Once correct has been verified : Reset your Election Timer
-	s.initFollowerDS()   // Once correct term has been verified : Go to Follower State no Matter What was previous State was
+	s.ResetTimer()         // Once correct has been verified : Reset your Election Timer
+	s.initFollowerDS()     // Once correct term has been verified : Go to Follower State no Matter What was previous State was
 	s.setCurrentTerm(term) // Updating currentTerm to what sent by leader
 	//s.log = s.log[0 : in.GetPrevLogIndex()+1] // Need to add protection here
 	// for i, entry := range in.GetEntries() {
@@ -45,8 +46,13 @@ func (s *server) RequestAppendRPC(ctx context.Context, in *pb.RequestAppend) (*p
 	// 	s.setLastLog(lastLogIndex, entry.Term)
 	// }
 	if len(in.GetEntries()) > 0 {
-		lastLogIndex, lastLogTerm = s.db.InsertBatchLog(lastLogIndex, in.GetEntries())
+		success := false
+		lastLogIndex, lastLogTerm, success = s.db.InsertBatchLog(lastLogIndex, in.GetEntries())
 		s.setLastLog(lastLogIndex, lastLogTerm)
+		if !success {
+			return &pb.ResponseAppend{Term: s.currentTerm, Success: false}, errors.New("Error while inserting log")
+			log.Printf("Server %v : RequestAppendRPC : Rollback : %v", serverID)
+		}
 	}
 	log.Printf("Server %v : RequestAppendRPC : Received leaderCommit : %v", serverID, in.GetLeaderCommit())
 	s.leaderId = in.GetLeaderId() // Need to protect this part
@@ -58,7 +64,6 @@ func (s *server) RequestAppendRPC(ctx context.Context, in *pb.RequestAppend) (*p
 }
 
 func (s *server) AppendRPC(address string, serverID int64) bool {
-	response := false
 	leaderId, _ := strconv.Atoi(os.Getenv("CandidateID"))
 	leaderID := int64(leaderId)
 	if s.getState() == leader {
@@ -119,7 +124,7 @@ func (s *server) AppendRPC(address string, serverID int64) bool {
 	// TODO update leader data for each worker
 
 	// TODO Update server currentTerm in all responses
-	return response
+	return false
 }
 
 func (s *server) HeartBeat() {

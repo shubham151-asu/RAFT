@@ -5,10 +5,11 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
-	"time"
 	"sync/atomic"
-    "strings"
+	"time"
+
 	"google.golang.org/grpc"
 	"raftAlgo.com/service/server/DB"
 	pb "raftAlgo.com/service/server/gRPC"
@@ -22,9 +23,9 @@ type logEntry struct {
 
 //var term , serverID , lastLogIndex , lastLogTerm, commitIndex, lastApplied, leaderId int64 = 2,2,2,2,2,2,2
 const (
-	leader    = 2
-	candidate = 1
-	follower  = 0
+	leader                = 2
+	candidate             = 1
+	follower              = 0
 	followerWriteWaitTime = 5000
 )
 
@@ -64,11 +65,11 @@ func (s *server) setCurrentTerm(term int64) {
 	atomic.StoreInt64(&s.currentTerm, term)
 }
 
-func (s *server) setTermAndVotedFor(term , votedFor int64){
-    s.Lock.Lock()
-    s.db.SetTermAndVotedFor(int(term),int(votedFor))
-    s.currentTerm = term
-    s.Lock.Unlock()
+func (s *server) setTermAndVotedFor(term, votedFor int64) {
+	s.Lock.Lock()
+	s.db.SetTermAndVotedFor(int(term), int(votedFor))
+	s.currentTerm = term
+	s.Lock.Unlock()
 }
 
 func (s *server) getLastLog() (index, term int64) {
@@ -95,7 +96,6 @@ func (s *server) verifyLastLogTermIndex(index, term int64) bool {
 	s.Lock.Unlock()
 	return response
 }
-
 
 func (s *server) getCommitIndex() int64 {
 	return atomic.LoadInt64(&s.commitIndex)
@@ -183,25 +183,23 @@ func (s *server) initFollowerDS() bool {
 }
 
 func (s *server) AddtoStateMachine() {
-    serverId := os.Getenv("CandidateID")
-    for
-    {
-        if s.lastApplied<s.getCommitIndex() && s.getState()==follower{
-            log.Printf("Server %v : AddtoStateMachine : Applying data to State Machine ",serverId)
-	        entryList := s.db.GetLogList(int(s.lastApplied), int(s.getCommitIndex()))
-	        for i:=0 ; i<len(entryList) ; i++ {
-	            command := entryList[i]
-	            if strings.EqualFold(command.GetCommand(), "put") {
-				    s.stateMachine[command.GetKey()] = command.GetValue()
-			    }
-			    s.lastApplied += 1
+	serverId := os.Getenv("CandidateID")
+	for {
+		if s.lastApplied < s.getCommitIndex() && (s.getState() == follower || s.getState() == leader) {
+			log.Printf("Server %v : AddtoStateMachine : Applying data to State Machine ", serverId)
+			entryList := s.db.GetLogList(int(s.lastApplied), int(s.getCommitIndex()))
+			for i := 0; i < len(entryList); i++ {
+				command := entryList[i]
+				if strings.EqualFold(command.GetCommand(), "put") {
+					s.stateMachine[command.GetKey()] = command.GetValue()
+				}
+				s.lastApplied += 1
 			}
-	    }
-	    log.Printf("Server %v : AddtoStateMachine : Not in follower State Going to Sleep ",serverId)
-	    time.Sleep(time.Duration(followerWriteWaitTime) * time.Millisecond)
-    }
+		}
+		log.Printf("Server %v : AddtoStateMachine : Nothing to add, Going to Sleep ", serverId)
+		time.Sleep(time.Duration(followerWriteWaitTime) * time.Millisecond)
+	}
 }
-
 
 func RPCInit() bool {
 	port := ":" + os.Getenv("PORT") + os.Getenv("CandidateID")

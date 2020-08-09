@@ -18,8 +18,8 @@ func (s *server) ClientRequestRPC(ctx context.Context, in *pb.ClientRequest) (*p
 	serverId := os.Getenv("CandidateID")
 	log.Printf("Server %v :  ClientRequestRPC : Received Command : %v Key : %v Value : %v", serverId, in.GetCommand(), in.GetKey(), in.GetValue())
 	log.Printf("Server %v :  ClientRequestRPC : State : %v", serverId, s.getState())
-	if strings.EqualFold(in.GetHealth(), "Alive"){
-        return &pb.ClientResponse{Success: true, Result: "", LeaderId: s.leaderId}, nil
+	if strings.EqualFold(in.GetHealth(), "Alive") {
+		return &pb.ClientResponse{Success: true, Result: "", LeaderId: s.leaderId}, nil
 	}
 	if !strings.EqualFold(in.GetCommand(), "put") && !strings.EqualFold(in.GetCommand(), "get") {
 		return &pb.ClientResponse{Success: false, Result: "", LeaderId: s.leaderId}, errors.New("Wrong command, only Put and Get allowed")
@@ -35,11 +35,11 @@ func (s *server) ClientRequestRPC(ctx context.Context, in *pb.ClientRequest) (*p
 		// Here All leader object data will be manipulated
 		//s.log = append(s.log, &pb.RequestAppendLogEntry{Command: in.GetCommand(), Term: s.currentTerm}) // Safety
 		lastLogIndex, _ := s.getLastLog()
-		lastLogIndex++
+		logIndex := lastLogIndex + 1
 		//log.Printf("Server %v :  ClientRequestRPC : Incremented lastLogIndex : %v",serverId,lastLogIndex)
-		s.db.InsertLog(int(lastLogIndex), int(s.getCurrentTerm()), in.GetCommand(), in.GetKey(), in.GetValue())
-		s.setLastLog(lastLogIndex, s.getCurrentTerm())
-		log.Printf("Server %v :  ClientRequestRPC : length of logs : %v", serverId, lastLogIndex+1)
+		s.db.InsertLog(int(logIndex), int(s.getCurrentTerm()), in.GetCommand(), in.GetKey(), in.GetValue())
+		s.setLastLog(logIndex, s.getCurrentTerm())
+		log.Printf("Server %v :  ClientRequestRPC : length of logs : %v", serverId, logIndex+1)
 		count := 1    // Vote self
 		finished := 1 // One vote count due to self
 		var mu sync.Mutex
@@ -52,7 +52,7 @@ func (s *server) ClientRequestRPC(ctx context.Context, in *pb.ClientRequest) (*p
 				continue
 			}
 			log.Printf("Server %v :  ClientRequestRPC : Address of the server:%v", serverId, address)
-			if int64(lastLogIndex) >= s.nextIndex[i-1] && s.getState() == leader {
+			if int64(logIndex) >= s.nextIndex[i-1] && s.getState() == leader {
 				log.Printf("Server %v :  ClientRequestRPC : Calling AppendEntry", serverId)
 				go func(address string, id int64) {
 					success := s.AppendRPC(address, id)
@@ -72,8 +72,9 @@ func (s *server) ClientRequestRPC(ctx context.Context, in *pb.ClientRequest) (*p
 		}
 		log.Printf("Server %v : ClientRequestRPC : Success Count : %v", serverId, count)
 		if count >= ((REPLICAS/2)+1) && s.getState() == leader {
-			if lastLogIndex > s.getCommitIndex() {
-				s.setCommitIndex(lastLogIndex) // Verify this Increment : Whether one or more than 1
+			if logIndex > s.getCommitIndex() {
+				s.setCommitIndex(logIndex) // Verify this Increment : Whether one or more than 1
+				s.lastApplied = logIndex
 			}
 			if strings.EqualFold(in.GetCommand(), "put") {
 				s.stateMachine[in.GetKey()] = in.GetValue()
@@ -88,6 +89,7 @@ func (s *server) ClientRequestRPC(ctx context.Context, in *pb.ClientRequest) (*p
 			}
 			return &pb.ClientResponse{Success: false, Result: "", LeaderId: s.leaderId}, errors.New("Something went wrong, please try again")
 		} else {
+			s.db.deleteLogByLogIndex(logIndex)
 			return &pb.ClientResponse{Success: false, Result: "", LeaderId: s.leaderId}, errors.New("Something went wrong, please try again")
 		}
 		mu.Unlock()
