@@ -3,43 +3,24 @@ package main
 import
 (
  "testing"
- "strings"
- "sync"
  "log"
 )
 
-var lock sync.Mutex
 
 
-func (c *Client) ConsistencyCheck()(string){
-    x := c.Get("x")
-    lock.Lock()
-    if !strings.EqualFold(x.GetResult(), "0"){
-        c.Put("y","1")
-    }
-    lock.Unlock()
-    y := c.Get("y")
-    lock.Lock()
-    if !strings.EqualFold(x.GetResult(), "0"){
-        c.Put("x","1")
-    }
-    lock.Unlock()
-    return x.GetResult() + y.GetResult()
-}
-
-func ConsistencyTest(t *testing.T){
+func TestConsistency(t *testing.T){
     client := Client{}
     client.InitializeCache()
     defer client.StopClientConnection()
     response := client.Put("x","0")
-    if response!=nil{
+    if response==nil{
         log.Printf("Test : ConsistencyCheck : Unable to set x")
     }
     response = client.Put("y","0")
-    if response!=nil{
+    if response==nil{
         log.Printf("Test : ConsistencyCheck : Unable to set y")
     }
-
+	
     testCases := []struct{
         Name string
         UnExpected string
@@ -55,9 +36,11 @@ func ConsistencyTest(t *testing.T){
     }
     for _,tc := range testCases {
         tc := tc
+	log.Printf("Starting threads %v",tc.Name)
         t.Run(tc.Name,func (t *testing.T){
             t.Parallel()
-            res := client.ConsistencyCheck()
+            
+            res := ConsistencyCheck()
             if res=="11"{
                 t.Errorf("ConsistencyCheck : found an unexpected value %v ",res)
             } else{
