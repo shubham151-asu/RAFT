@@ -73,20 +73,22 @@ func (s *server) setTermAndVotedFor(term, votedFor int64) {
 }
 
 func (s *server) getLastLog() (index, term int64) {
-	s.Lock.Lock()
+	//s.Lock.Lock()
 	index = s.lastLogIndex
 	term = s.lastLogTerm
-	s.Lock.Unlock()
+	//s.Lock.Unlock()
 	return index, term
 }
 
 func (s *server) setLastLog(index, term int64) {
-	s.Lock.Lock()
+	//s.Lock.Lock()
 	s.lastLogIndex = index
 	s.lastLogTerm = term
-	s.Lock.Unlock()
+	//s.Lock.Unlock()
 }
-
+func (s *server) incrementLastLogIndex(index int64) {
+	atomic.AddInt64(&s.lastLogIndex, index)
+}
 func (s *server) verifyLastLogTermIndex(index, term int64) bool {
 	response := false
 	s.Lock.Lock()
@@ -193,7 +195,7 @@ func (s *server) AddtoStateMachine() {
 				if strings.EqualFold(command.GetCommand(), "put") {
 					s.stateMachine[command.GetKey()] = command.GetValue()
 				}
-				s.lastApplied += 1
+				s.lastApplied++
 			}
 		}
 		log.Printf("Server %v : AddtoStateMachine : Nothing to add, Going to Sleep ", serverId)

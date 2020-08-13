@@ -116,7 +116,7 @@ func (db *Conn) GetVotedFor(currentTerm int64) (votedFor int64) {
 	return votedFor
 }
 
-func (db *Conn) InsertLog(logIndex int, term int, command string, key string, value string) {
+func (db *Conn) InsertLog(logIndex int, term int, command string, key string, value string) (success bool) {
 	serverId := os.Getenv("CandidateID")
 	log.Printf("Server %v : InsertLog : logIndex : %v &&  term : %v && command : %v && key : %v && value : %v ", serverId, strconv.Itoa(int(logIndex)), strconv.Itoa(int(term)), command, key, value)
 	tx, err := db.DB.Begin()
@@ -137,9 +137,11 @@ func (db *Conn) InsertLog(logIndex int, term int, command string, key string, va
 	if err != nil {
 		log.Printf("Server %v : InsertLog : Transaction Rollback", serverId)
 		tx.Rollback()
+		return false
 	} else {
 		tx.Commit()
 		log.Printf("Server %v : InsertLog : Transaction Successfully Committed", serverId)
+		return true
 	}
 
 	// statement, err = s.db.Prepare("SELECT term,command FROM logs WHERE logIndex = ?")
@@ -159,7 +161,7 @@ func (db *Conn) InsertLog(logIndex int, term int, command string, key string, va
 	// RowsAffected, err := res.RowsAffected()
 	// log.Printf("LastInsertId : %v  RowsAffected: %v", LastInsertId, RowsAffected)
 }
-func (db *Conn) deleteLogGreaterThanEqual(logIndex int) {
+func (db *Conn) DeleteLogGreaterThanEqual(logIndex int) {
 	serverId := os.Getenv("CandidateID")
 	tx, err := db.DB.Begin()
 	if err != nil {
@@ -181,7 +183,7 @@ func (db *Conn) deleteLogGreaterThanEqual(logIndex int) {
 	}
 
 }
-func (db *Conn) deleteLogByLogIndex(logIndex int) {
+func (db *Conn) DeleteLogByLogIndex(logIndex int) {
 	serverId := os.Getenv("CandidateID")
 	tx, err := db.DB.Begin()
 	if err != nil {
@@ -228,7 +230,7 @@ func (db *Conn) InsertBatchLog(lastLogIndex int64, logList []*pb.RequestAppendLo
 				log.Printf("Server %v : InsertBatchLog : already updated : term : %v && Entry : %v", serverId, lastLogIndex, term, logEntry)
 				continue
 			} else {
-				db.deleteLogGreaterThanEqual(int(logEntry.LogIndex))
+				db.DeleteLogGreaterThanEqual(int(logEntry.LogIndex))
 				entryMap = make(map[int64]*pb.RequestAppendLogEntry)
 			}
 		}

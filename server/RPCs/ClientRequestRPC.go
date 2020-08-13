@@ -16,9 +16,9 @@ import (
 
 func (s *server) ClientRequestRPC(ctx context.Context, in *pb.ClientRequest) (*pb.ClientResponse, error) {
 	serverId := os.Getenv("CandidateID")
-	log.Printf("Server %v :  ClientRequestRPC : Received Command : %v Key : %v Value : %v", serverId, in.GetCommand(), in.GetKey(), in.GetValue())
+	log.Printf("Server %v :  ClientRequestRPC : Received Health : %v Command : %v Key : %v Value : %v", serverId, in.GetHealth(), in.GetCommand(), in.GetKey(), in.GetValue())
 	log.Printf("Server %v :  ClientRequestRPC : State : %v", serverId, s.getState())
-	if strings.EqualFold(in.GetHealth(), "Alive") {
+	if strings.EqualFold(in.GetCommand(), "Health") {
 		return &pb.ClientResponse{Success: true, Result: "", LeaderId: s.leaderId}, nil
 	}
 	if !strings.EqualFold(in.GetCommand(), "put") && !strings.EqualFold(in.GetCommand(), "get") {
@@ -34,11 +34,15 @@ func (s *server) ClientRequestRPC(ctx context.Context, in *pb.ClientRequest) (*p
 		log.Printf("Server %v :  ClientRequestRPC : Appending ClientRequest to Logs : Term : %v : Command : %v Key : %v Value : %v", serverId, s.getCurrentTerm(), in.GetCommand(), in.GetKey(), in.GetValue())
 		// Here All leader object data will be manipulated
 		//s.log = append(s.log, &pb.RequestAppendLogEntry{Command: in.GetCommand(), Term: s.currentTerm}) // Safety
-		lastLogIndex, _ := s.getLastLog()
-		logIndex := lastLogIndex + 1
+		//s.Lock.Lock()
+		s.incrementLastLogIndex(1)
+		logIndex, _ := s.getLastLog()
+		//logIndex := lastLogIndex + 1
+		//s.setLastLog(logIndex, s.getCurrentTerm())
+		//s.Lock.Unlock()
 		//log.Printf("Server %v :  ClientRequestRPC : Incremented lastLogIndex : %v",serverId,lastLogIndex)
 		s.db.InsertLog(int(logIndex), int(s.getCurrentTerm()), in.GetCommand(), in.GetKey(), in.GetValue())
-		s.setLastLog(logIndex, s.getCurrentTerm())
+
 		log.Printf("Server %v :  ClientRequestRPC : length of logs : %v", serverId, logIndex+1)
 		count := 1    // Vote self
 		finished := 1 // One vote count due to self
@@ -89,7 +93,7 @@ func (s *server) ClientRequestRPC(ctx context.Context, in *pb.ClientRequest) (*p
 			}
 			return &pb.ClientResponse{Success: false, Result: "", LeaderId: s.leaderId}, errors.New("Something went wrong, please try again")
 		} else {
-			s.db.deleteLogByLogIndex(logIndex)
+			s.db.DeleteLogByLogIndex(int(logIndex))
 			return &pb.ClientResponse{Success: false, Result: "", LeaderId: s.leaderId}, errors.New("Something went wrong, please try again")
 		}
 		mu.Unlock()
@@ -106,7 +110,7 @@ func (s *server) ClientRequestRPC(ctx context.Context, in *pb.ClientRequest) (*p
 		c := pb.NewRPCServiceClient(conn)
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
-		response, err := c.ClientRequestRPC(ctx, &pb.ClientRequest{Command: in.GetCommand(), Key: in.GetKey(), Value: in.GetValue()})
+		response, err := c.ClientRequestRPC(ctx, &pb.ClientRequest{Command: in.GetCommand(), Health: in.GetHealth(), Key: in.GetKey(), Value: in.GetValue()})
 		if err != nil {
 			log.Printf("Server %v :  ClientRequestRPC : could not redirect: %v", serverId, err)
 		}

@@ -52,7 +52,7 @@ func (c *Client) SetNewLeader(leader string) {
 }
 
 func (client *Client) AssignNewLeader() (ret bool) {
-	message := pb.ClientRequest{Health: "Alive"}
+	message := pb.ClientRequest{Command: "Alive", Health: "Alive", Key: "", Value: ""}
 	ret = false
 	count := 0
 	for i := 1; i <= NUM_REPLICAS; i++ {
@@ -86,7 +86,8 @@ func (client *Client) AssignNewLeader() (ret bool) {
 }
 
 func (client *Client) SendMessage(message *pb.ClientRequest) (ret *pb.ClientResponse) {
-	log.Printf("Sending Message")
+
+	log.Printf("Sending Message Health : %v Command : %v Key : %v Value : %v", message.GetHealth(), message.GetCommand(), message.GetKey(), message.GetValue())
 	if client.conn == nil {
 		client.StartClientConnection()
 	}
@@ -112,13 +113,13 @@ func (client *Client) SendMessage(message *pb.ClientRequest) (ret *pb.ClientResp
 }
 
 func (c *Client) Put(key, value string) (response *pb.ClientResponse) {
-	message := pb.ClientRequest{Command: "put", Key: key, Value: value}
+	message := pb.ClientRequest{Command: "put", Health: "", Key: key, Value: value}
 	response = c.SendMessage(&message)
 	return response
 }
 
 func (c *Client) Get(key string) (response *pb.ClientResponse) {
-	message := pb.ClientRequest{Command: "get", Key: key, Value: ""}
+	message := pb.ClientRequest{Command: "get", Health: "", Key: key, Value: ""}
 	response = c.SendMessage(&message)
 	return response
 }
