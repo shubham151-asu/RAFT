@@ -96,7 +96,6 @@ func (s *server) verifyLastLogTermIndex(index, term int64) bool {
 	return response
 }
 
-
 func (s *server) getCommitIndex() int64 {
 	return atomic.LoadInt64(&s.commitIndex)
 }
@@ -115,6 +114,53 @@ func (s *server) getLastApplied() int64 {
 
 func (s *server) setLastApplied(index int64) {
 	atomic.StoreInt64(&s.lastApplied, index)
+}
+
+func (s *server) getNextLogIndex(serverID int64) int64{
+    return atomic.LoadInt64(&s.nextIndex[serverID - 1])
+}
+
+func (s *server) setNextLogIndex(serverID int64,index int64) {
+    atomic.StoreInt64(&s.nextIndex[serverID - 1], index)
+}
+
+func (s *server) updateDBandStateLeader(lastLogIndex int64, in *pb.ClientRequest){
+    s.Lock.Lock()
+    s.db.InsertLog(int(lastLogIndex), int(s.getCurrentTerm()), in.GetCommand(), in.GetKey(), in.GetValue())
+	s.setLastLog(lastLogIndex, s.getCurrentTerm())
+	s.Lock.Unlock()
+}
+
+func (s *server) updateDBandStateFollower(lastLogIndex int64, in *pb.RequestAppend){
+    s.Lock.Lock()
+    s.db.InsertBatchLog(lastLogIndex, in.GetEntries())
+	s.setLastLog(lastLogIndex, s.getCurrentTerm())
+	s.Lock.Unlock()
+}
+
+func (s *server) verifyLastLogTermOrIndex(index, term int64) int {
+	response := 0
+	serverId := os.Getenv("CandidateID")
+	log.Printf("Server %v : verifyLastLogTermOrIndex : server lastLogIndex & currentTerm : %v : %v", serverId , s.lastLogIndex , s.currentTerm)
+    log.Printf("Server %v : verifyLastLogTermOrIndex : Leader sent lastLogIndex & currentTerm : %v : %v", serverId , index , term)
+	s.Lock.Lock()
+	switch {
+	    case s.lastLogIndex == index && s.currentTerm>term:
+		    response = 0
+	    case s.lastLogIndex > index && s.currentTerm==term:
+	        response = 1
+	    case s.lastLogIndex == index && s.currentTerm!=term && term!=0:
+	        response = 2
+	}
+	s.Lock.Unlock()
+	return response
+}
+
+func (s *server) deletelastlogIndexTerm(in *pb.RequestAppend){
+    s.Lock.Lock()
+    s.db.DeleteLogGreaterThanEqual(int(in.GetPrevLogIndex()))
+    s.setLastLog(in.GetPrevLogIndex(), in.GetTerm())
+    s.Lock.Unlock()
 }
 
 func (s *server) initServerDS() {

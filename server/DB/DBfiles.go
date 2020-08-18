@@ -3,7 +3,7 @@ package DB
 import (
 	"database/sql"
 	"log"
-	"math"
+	//"math"
 	"os"
 	"strconv"
 	_ "github.com/mattn/go-sqlite3"
@@ -159,7 +159,7 @@ func (db *Conn) InsertLog(logIndex int, term int, command string, key string, va
 	// RowsAffected, err := res.RowsAffected()
 	// log.Printf("LastInsertId : %v  RowsAffected: %v", LastInsertId, RowsAffected)
 }
-func (db *Conn) deleteLogGreaterThanEqual(logIndex int) {
+func (db *Conn) DeleteLogGreaterThanEqual(logIndex int) {
 	serverId := os.Getenv("CandidateID")
 	tx, err := db.DB.Begin()
 	if err != nil {
@@ -195,23 +195,24 @@ func (db *Conn) InsertBatchLog(lastLogIndex int64, logList []*pb.RequestAppendLo
 		log.Fatal("err : ", err)
 	}
 	term = logList[0].Term
-	entryList := db.GetLogList(int(lastLogIndex+1), math.MaxInt64)
-	var entryMap map[int64]*pb.RequestAppendLogEntry
-	for _, entry := range entryList {
-		entryMap[entry.LogIndex] = entry
-	}
+// 	entryList := db.GetLogList(int(lastLogIndex+1), math.MaxInt64)
+// 	var entryMap map[int64]*pb.RequestAppendLogEntry
+// 	for _, entry := range entryList {
+// 		entryMap[entry.LogIndex] = entry
+// 	}
 	lastLogIndexBeforeCommit := lastLogIndex
 	for _, logEntry := range logList {
-		lastLogIndex = logEntry.LogIndex
-		if val, exist := entryMap[logEntry.LogIndex]; exist {
-			if val.Term == logEntry.Term {
-				log.Printf("Server %v : InsertBatchLog : already updated : term : %v && Entry : %v", serverId, lastLogIndex, term, logEntry)
-				continue
-			} else {
-				db.deleteLogGreaterThanEqual(int(logEntry.LogIndex))
-				entryMap = make(map[int64]*pb.RequestAppendLogEntry)
-			}
-		}
+    	lastLogIndex = logEntry.LogIndex
+// 		if val, exist := entryMap[logEntry.LogIndex]; exist {
+// 			if val.Term == logEntry.Term {
+// 				log.Printf("Server %v : InsertBatchLog : already updated : term : %v && Entry : %v", serverId, lastLogIndex, term, logEntry)
+// 				continue
+// 			} else {
+// 			    log.Printf("Server %v : InsertBatchLog :  logMismatch found : %v &&  deleting Entries", serverId, lastLogIndex)
+// 				db.DeleteLogGreaterThanEqual(int(logEntry.LogIndex))
+// 				entryMap = make(map[int64]*pb.RequestAppendLogEntry)
+// 			}
+// 		}
 		_, err = tx.Stmt(statement).Exec(logEntry.LogIndex, logEntry.Term, logEntry.Command, logEntry.Key, logEntry.Value)
 		term = logEntry.Term
 		log.Printf("Server %v : InsertBatchLog : lastLogIndex : %v && term : %v && Entry : %v", serverId, lastLogIndex, term, logEntry)

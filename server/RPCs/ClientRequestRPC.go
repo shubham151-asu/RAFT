@@ -14,6 +14,9 @@ import (
 	pb "raftAlgo.com/service/server/gRPC"
 )
 
+
+
+
 func (s *server) ClientRequestRPC(ctx context.Context, in *pb.ClientRequest) (*pb.ClientResponse, error) {
 	serverId := os.Getenv("CandidateID")
 	log.Printf("Server %v :  ClientRequestRPC : Received Command : %v Key : %v Value : %v", serverId, in.GetCommand(), in.GetKey(), in.GetValue())
@@ -39,6 +42,7 @@ func (s *server) ClientRequestRPC(ctx context.Context, in *pb.ClientRequest) (*p
 		//log.Printf("Server %v :  ClientRequestRPC : Incremented lastLogIndex : %v",serverId,lastLogIndex)
 		s.db.InsertLog(int(lastLogIndex), int(s.getCurrentTerm()), in.GetCommand(), in.GetKey(), in.GetValue())
 		s.setLastLog(lastLogIndex, s.getCurrentTerm())
+		//s.updateDBandStateLeader(lastLogIndex,in)
 		log.Printf("Server %v :  ClientRequestRPC : length of logs : %v", serverId, lastLogIndex+1)
 		count := 1    // Vote self
 		finished := 1 // One vote count due to self
@@ -54,8 +58,8 @@ func (s *server) ClientRequestRPC(ctx context.Context, in *pb.ClientRequest) (*p
 			log.Printf("Server %v :  ClientRequestRPC : Address of the server:%v", serverId, address)
 			if int64(lastLogIndex) >= s.nextIndex[i-1] && s.getState() == leader {
 				log.Printf("Server %v :  ClientRequestRPC : Calling AppendEntry", serverId)
-				go func(address string, id int64) {
-					success := s.AppendRPC(address, id)
+				go func(address string, id int64 , lastLogIndex int64) {
+					success := s.AppendRPC(address, id, lastLogIndex , false)
 					mu.Lock()
 					defer mu.Unlock()
 					if success {
@@ -63,7 +67,7 @@ func (s *server) ClientRequestRPC(ctx context.Context, in *pb.ClientRequest) (*p
 					}
 					finished++
 					cond.Broadcast()
-				}(address, int64(i))
+				}(address, int64(i),lastLogIndex)
 			}
 		}
 		mu.Lock()

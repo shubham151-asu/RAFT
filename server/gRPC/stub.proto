@@ -45,9 +45,24 @@ message ClientRequest {
 		string value = 4;
 }
 
+message logsRequest{
+    string reportLog = 1;
+}
+
+message logsResponse{
+    message logEntry{
+		string command = 1;
+		string key = 2;
+		string value = 3;
+		int64 term = 4;
+		int64 logIndex = 5;
+	    }
+	repeated logEntry entries = 1;
+}
 
 service RPCService {
     rpc RequestVoteRPC(RequestVote) returns (ResponseVote) {}
     rpc RequestAppendRPC(RequestAppend) returns (ResponseAppend) {}
     rpc ClientRequestRPC(ClientRequest) returns (ClientResponse) {}
+    rpc LogRequestRPC(logsRequest) returns (logsResponse) {}
 }

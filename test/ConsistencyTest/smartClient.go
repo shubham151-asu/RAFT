@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 	"strconv"
-	pb "../server/gRPC"
+	pb "../../server/gRPC"
 	"google.golang.org/grpc"
 	"github.com/patrickmn/go-cache"
 )
@@ -120,6 +120,12 @@ func (c *Client)Put(key,value string)(response *pb.ClientResponse){
 
 func (c *Client)Get(key string)(response *pb.ClientResponse){
     message := pb.ClientRequest{Command: "get", Key: key}
+    response = c.SendMessage(&message)
+    return response
+}
+
+func (c *Client)LogCheck()(response *pb.ClientResponse){
+    message := pb.ClientRequest{Health: "Logs"}
     response = c.SendMessage(&message)
     return response
 }
