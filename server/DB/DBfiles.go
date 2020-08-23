@@ -3,9 +3,11 @@ package DB
 import (
 	"database/sql"
 	"log"
+
 	//"math"
 	"os"
 	"strconv"
+
 	_ "github.com/mattn/go-sqlite3"
 	pb "raftAlgo.com/service/server/gRPC"
 )
@@ -48,7 +50,7 @@ func (db *Conn) CreateDBStructure() (lastLogIndex, lastLogTerm int64) {
 		log.Printf("Server %v : CreateDBStructure : Table 'common' exists", serverId)
 		var votedFor int
 		var term int
-		rows.Scan(&term,&votedFor)
+		rows.Scan(&term, &votedFor)
 	} else {
 		log.Printf("Server %v : CreateDBStructure : Created Table 'common'", serverId)
 	}
@@ -73,10 +75,10 @@ func (db *Conn) CreateDBStructure() (lastLogIndex, lastLogTerm int64) {
 	return lastLogIndex, lastLogTerm
 }
 
-func (db *Conn) SetTermAndVotedFor(currentTerm,votedFor int){
-    serverId := os.Getenv("CandidateID")
-    log.Printf("Server %v : SetTermAndVotedFor : term : %v &&  votedFor : %v ",serverId,currentTerm,votedFor)
-    tx, err := db.DB.Begin()
+func (db *Conn) SetTermAndVotedFor(currentTerm, votedFor int) {
+	serverId := os.Getenv("CandidateID")
+	log.Printf("Server %v : SetTermAndVotedFor : term : %v &&  votedFor : %v ", serverId, currentTerm, votedFor)
+	tx, err := db.DB.Begin()
 	log.Printf("Server %v : SetTermAndVotedFor : Transaction Begins", serverId)
 	if err != nil {
 		log.Fatal("err : ", err)
@@ -85,7 +87,7 @@ func (db *Conn) SetTermAndVotedFor(currentTerm,votedFor int){
 	if err != nil {
 		log.Fatal("err : ", err)
 	}
-	_, err = tx.Stmt(statement).Exec(currentTerm,votedFor)
+	_, err = tx.Stmt(statement).Exec(currentTerm, votedFor)
 	//log.Printf("Server %v : InsertLog : Statement Executed",serverId)
 	if err != nil {
 		log.Printf("Server %v : SetTermAndVotedFor : Transaction Rollback", serverId)
@@ -96,8 +98,8 @@ func (db *Conn) SetTermAndVotedFor(currentTerm,votedFor int){
 	}
 }
 
-func (db *Conn) GetVotedFor(currentTerm int64) (votedFor int64){
-    serverId := os.Getenv("CandidateID")
+func (db *Conn) GetVotedFor(currentTerm int64) (votedFor int64) {
+	serverId := os.Getenv("CandidateID")
 	log.Printf("Server %v : GetVotedFor : term : %v", serverId, currentTerm)
 	statement, err := db.DB.Prepare("SELECT votedFor FROM common WHERE common.term = ?")
 
@@ -105,16 +107,15 @@ func (db *Conn) GetVotedFor(currentTerm int64) (votedFor int64){
 	if err != nil {
 		log.Fatal("err in getLog : ", err)
 	}
-	
+
 	if rows.Next() {
 		var votedTo int
 		rows.Scan(&votedTo)
-		log.Printf("Server %v : GetVotedFor : currentTerm : %v  && votedFor : %v", serverId,  currentTerm, votedTo)
+		log.Printf("Server %v : GetVotedFor : currentTerm : %v  && votedFor : %v", serverId, currentTerm, votedTo)
 		votedFor = int64(votedTo)
 	}
 	return votedFor
 }
-
 
 func (db *Conn) InsertLog(logIndex int, term int, command string, key string, value string) {
 	serverId := os.Getenv("CandidateID")
@@ -188,31 +189,31 @@ func (db *Conn) InsertBatchLog(lastLogIndex int64, logList []*pb.RequestAppendLo
 	if err != nil {
 		log.Fatal("err : ", err)
 	}
-	statement, err := db.DB.Prepare("INSERT INTO logs (logIndex,term, command, key, value) VALUES (?, ?,?,?,?)")
+	statement, err := db.DB.Prepare("INSERT OR REPLACE INTO logs (logIndex,term, command, key, value) VALUES (?, ?,?,?,?)")
 	//log.Printf("Server %v : InsertBatchLog : Statement Prepared",serverId)
 
 	if err != nil {
 		log.Fatal("err : ", err)
 	}
 	term = logList[0].Term
-// 	entryList := db.GetLogList(int(lastLogIndex+1), math.MaxInt64)
-// 	var entryMap map[int64]*pb.RequestAppendLogEntry
-// 	for _, entry := range entryList {
-// 		entryMap[entry.LogIndex] = entry
-// 	}
+	// 	entryList := db.GetLogList(int(lastLogIndex+1), math.MaxInt64)
+	// 	var entryMap map[int64]*pb.RequestAppendLogEntry
+	// 	for _, entry := range entryList {
+	// 		entryMap[entry.LogIndex] = entry
+	// 	}
 	lastLogIndexBeforeCommit := lastLogIndex
 	for _, logEntry := range logList {
-    	lastLogIndex = logEntry.LogIndex
-// 		if val, exist := entryMap[logEntry.LogIndex]; exist {
-// 			if val.Term == logEntry.Term {
-// 				log.Printf("Server %v : InsertBatchLog : already updated : term : %v && Entry : %v", serverId, lastLogIndex, term, logEntry)
-// 				continue
-// 			} else {
-// 			    log.Printf("Server %v : InsertBatchLog :  logMismatch found : %v &&  deleting Entries", serverId, lastLogIndex)
-// 				db.DeleteLogGreaterThanEqual(int(logEntry.LogIndex))
-// 				entryMap = make(map[int64]*pb.RequestAppendLogEntry)
-// 			}
-// 		}
+		lastLogIndex = logEntry.LogIndex
+		// 		if val, exist := entryMap[logEntry.LogIndex]; exist {
+		// 			if val.Term == logEntry.Term {
+		// 				log.Printf("Server %v : InsertBatchLog : already updated : term : %v && Entry : %v", serverId, lastLogIndex, term, logEntry)
+		// 				continue
+		// 			} else {
+		// 			    log.Printf("Server %v : InsertBatchLog :  logMismatch found : %v &&  deleting Entries", serverId, lastLogIndex)
+		// 				db.DeleteLogGreaterThanEqual(int(logEntry.LogIndex))
+		// 				entryMap = make(map[int64]*pb.RequestAppendLogEntry)
+		// 			}
+		// 		}
 		_, err = tx.Stmt(statement).Exec(logEntry.LogIndex, logEntry.Term, logEntry.Command, logEntry.Key, logEntry.Value)
 		term = logEntry.Term
 		log.Printf("Server %v : InsertBatchLog : lastLogIndex : %v && term : %v && Entry : %v", serverId, lastLogIndex, term, logEntry)
