@@ -1,14 +1,8 @@
-# RAFT
+# Summary 
  The project is implementation of RAFT consensus algorithm based on raft extended paper
  and learnings from MIT Lecture on Distributed Systems. A distributed Key-Value store system
- has been built and features such as consistency, fault-tolerance, and high availability have been
- achieved as a part of RAFT implementation. 
- 
- Why do we need RAFT ?
- - To provide the key features of fault-tolerance and high availability, RAFT replicates 
-   the state Machine (Key-Value pair system in this case). If the states are replicated and are consistent
-   RAFT system have high availability in the event of a server crash or the network is down.
-   RAFT also guarantees the consistency through its implementations. 
+ has been built and features such as consistency and high availability have been achieved as 
+ a part of RAFT implementation. 
  
 # Distributed Systems 
  Collection of autonomous computers that appear to user as one integrated system. Overall
@@ -19,6 +13,13 @@
  In this project, the distributed system developed provides a key-Value store abstraction while
  hiding the key feature of consistency, crash recovery and high availability. 
 
+# RAFT
+ To develop a distributed systems that stores key-value pair, and has features of strong consistency,
+ high availability, and is able to automatically recover from crash. We used RAFT consensus algorithm.   
+ RAFT replicates the state Machine (Key-Value pair system in this case) onto multiple machine. If the 
+ states are replicated and are consistent RAFT system have high availability in the event of a server 
+ crash or the network is down. RAFT also guarantees the writes are consistent through its implementations. 
+  
 # How does RAFT work
  Time Synchronization :
  For any distributed system, one of the most important challenge is time sync. Different DS
