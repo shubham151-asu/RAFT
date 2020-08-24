@@ -1,8 +1,8 @@
 # Summary 
- The project is implementation of RAFT consensus algorithm based on raft extended paper
- and learnings from MIT Lecture on Distributed Systems. A distributed Key-Value store system
- has been built and features such as consistency and high availability have been achieved as 
- a part of RAFT implementation. 
+ The project is an implementation of RAFT consensus algorithm based on raft extended paper
+ and learnings from MIT Lecture on Distributed Systems. A fault-tolerant distributed Key-Value
+ store system has been built and features such as consistency and high availability have been
+ achieved as a part of RAFT implementation. 
  
 # Distributed Systems 
  Collection of autonomous computers that appear to user as one integrated system. Overall
@@ -135,7 +135,7 @@
   over the period of time. Thus, raft based systems automatically recover in the event of crash or lag
  
   
- 
+
  
  
  
