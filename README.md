@@ -135,7 +135,15 @@
   over the period of time. Thus, raft based systems automatically recover in the event of crash or lag
  
   
-
+# RUN
+- To Run RAFT based Key-Value store system
+  - A Docker environment has been developed. If 3 REPLICAS are required in configFile use NUMREPLICAS=3 <br />
+   use command :docker-compose up --build 
+   
+- To test
+    go inside test folder(s) and run <br />
+    go test -v (assuming go installed in the machine)  
+  
  
  
  
