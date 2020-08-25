@@ -15,10 +15,11 @@
 
 # RAFT
  To develop a distributed systems that stores key-value pair, and has features of strong consistency,
- high availability, and is able to automatically recover from crash. We used RAFT consensus algorithm.   
- RAFT replicates the state Machine (Key-Value pair system in this case) onto multiple machine. If the 
- states are replicated and are consistent RAFT system have high availability in the event of a server 
- crash or the network is down. RAFT also guarantees the writes are consistent through its implementations. 
+ high availability, and also recover from crash, we used RAFT consensus algorithm. RAFT replicates
+ the state Machine (Key-Value pair system in this case) onto multiple machine. If the 
+ states are replicated and are consistent RAFT systems responds in the event of a server 
+ crash or the network between two servers is down. RAFT also guarantees the writes are consistent 
+ through its implementations. 
   
 # How does RAFT work
  Time Synchronization :
