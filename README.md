@@ -5,20 +5,19 @@
  achieved as a part of RAFT implementation. 
  
 # Distributed Systems 
- Collection of autonomous computers that appear to user as one integrated system. Overall
- these computer give an abstraction of a purpose that they are built. E:g A Distributed
- File Systems such as GFS appears like file system for a user or application but internally 
- it distributes the file data into 64MB chunks to provide high performance for certain R/W tasks
+ Collection of autonomous computers that appear to the user as one integrated system. Overall
+ these computers give an abstraction of a purpose that they are built for. E:g A Distributed
+ File Systems such as GFS is a file system for a user or application but internally 
+ it distributes the file data into chunks to provide high performance for certain R/W tasks
  
- In this project, the distributed system developed provides a key-Value store abstraction while
- hiding the key feature of consistency, crash recovery and high availability. 
+ In this project, the distributed system developed provides a fuctionality of a key-Value store
+ while abstracts the non-functional feature of consistency, reliablity and high availability. 
 
 # RAFT
- To develop a distributed systems that stores key-value pair, and has features of strong consistency,
- high availability, and also recover from crash, we used RAFT consensus algorithm. RAFT replicates
- the state Machine (Key-Value pair system in this case) onto multiple machine. If the 
- states are replicated and are consistent RAFT systems responds in the event of a server 
- crash or the network between two servers is down. RAFT also guarantees the writes are consistent 
+ To develop a distributed systems that stores key-value pair service which is high available, 
+ we haveused RAFT consensus algorithm. RAFT replicates the state Machine (Key-Value pair system in this case)
+ onto multiple machines. If the states are replicated and are consistent, the quorom cluster
+ would responds even in the event of a server crash . RAFT also guarantees the writes are consistent 
  through its implementations. 
   
 # How does RAFT work
