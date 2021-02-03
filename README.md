@@ -1,32 +1,46 @@
 # Summary 
- The project is an implementation of RAFT consensus algorithm based on raft extended paper
- and learnings from MIT Lecture on Distributed Systems. A fault-tolerant distributed Key-Value
- store system has been built and features such as consistency and high availability have been
- achieved as a part of RAFT implementation. 
+ The project is an implementation of RAFT consensus algorithm from raft-extended paper
+ and learnings from MIT Lecture on Distributed Systems. The project involves development of
+ a reliable distributed key-value pair storage system by achieving fault-tolerance and 
+ automatic crash recoverability. The system is strongly consistent and supports high availability
+ by synchronization between N quorum replicas tested on docker containers where N is configurable
+ odd number to achieve consensus.
+ 
+ Link: https://pdos.csail.mit.edu/6.824/papers/raft-extended.pdf
  
 # Distributed Systems 
  Collection of autonomous computers that appear to the user as one integrated system. Overall
- these computers give an abstraction of a purpose that they are built for. E:g A Distributed
- File Systems such as GFS is a file system for a user or application but internally 
- it distributes the file data into chunks to provide high performance for certain R/W tasks
+ these connected computers give an abstraction to the end user but inside they are much more.
+ E:g A Distributed File Systems such as GFS is a file system for a user or an application but 
+ internally it distributes the file data into chunks to provide high performance for R/W tasks
  
  In this project, the distributed system developed provides a fuctionality of a key-Value store
- while abstracts the non-functional feature of consistency, reliablity and high availability. 
+ with a Get/Put key values functions while it abstracts the non-functional feature of consistency, 
+ reliablity and high availability. 
 
 # RAFT
- To develop a distributed systems that stores key-value pair service which is high available, 
- we haveused RAFT consensus algorithm. RAFT replicates the state Machine (Key-Value pair system in this case)
- onto multiple machines. If the states are replicated and are consistent, the quorom cluster
- would responds even in the event of a server crash . RAFT also guarantees the writes are consistent 
- through its implementations. 
+ RAFT is a replica consensus protocol, a modified version of paxos consensus algorithm.
+ RAFT replicates the state Machine (Key-Value pair system in this case)
+ onto multiple machines by using logs. The logs are generated as well as propogated to 
+ all the replicas whenever an event occures such as R/W requests. Raft implements consensus by first
+ electing a distinguished leader, then giving the leader complete responsibility for managing the replicated log to all the followers.
+ If the logs are replicated and are consistent, the state machines also become consistent.
+ A leader can fail or be- come disconnected from the other servers, in which case a new leader is elected.
+ 
+ Given the leader approach, Raft decomposes the consensus problem into three relatively independent subproblems
+  - Leader election: a new leader must be chosen when an existing leader fails 
+  - Log replication: the leader must accept log entries from clients and replicate them across the cluster,
+    forcing the other logs to agree with its own 
+  - Safety: the key safety property for Raft is the State Machine Safety Property - if any server has applied a
+    particular log entry to its state machine, then no other server may apply a different command for the same log index
   
 # How does RAFT work
- Time Synchronization :
+ Time Synchronization : Term
  For any distributed system, one of the most important challenge is time sync. Different DS
  architecture have different time sync implementation such as two-time scheme using lamport's
- global clock in SPANNER. However, the RAFT uses term for the syncing time. For any request 
- response sent by one raft system to another term is shared to verify if the request is valid 
- and also to update times
+ global clock in SPANNER. However, the RAFT uses "term" for the syncing time. For any request 
+ response sent by one raft system to another "term" is shared to verify if the request is valid 
+ and also to synchronize time to achieve consensus.
   
   
   
@@ -148,4 +162,3 @@
  
  
  
- Link: https://pdos.csail.mit.edu/6.824/papers/raft-extended.pdf
