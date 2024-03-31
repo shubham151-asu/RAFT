@@ -35,7 +35,7 @@
     particular log entry to its state machine, then no other server may apply a different command for the same log index
   
 # How does RAFT work ?
- Time Synchronization : Term
+- Time Synchronization
  For any distributed system, one of the most important challenge is time sync. Different DS
  architecture have different time sync implementation such as two-time scheme using lamport's
  global clock in SPANNER. However, the RAFT uses "term" for the syncing time. For any request 
