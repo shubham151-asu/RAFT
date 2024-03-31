@@ -34,7 +34,7 @@
   - Safety: the key safety property for Raft is the State Machine Safety Property - if any server has applied a
     particular log entry to its state machine, then no other server may apply a different command for the same log index
   
-# How does RAFT work
+# How does RAFT work ?
  Time Synchronization : Term
  For any distributed system, one of the most important challenge is time sync. Different DS
  architecture have different time sync implementation such as two-time scheme using lamport's
